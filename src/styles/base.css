@@ -1,0 +1,93 @@
+/**
+ * Base Styles
+ * Foundation styles, resets, and global utilities
+ */
+
+/* Animations */
+@keyframes yt-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes yt-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Base utility classes */
+.yt-empty {
+    opacity: 0.6;
+    padding: var(--yt-spacing-5xl) var(--yt-spacing-2xl);
+    text-align: center;
+    color: var(--yt-text-tertiary);
+}
+
+.yt-loading {
+    display: none;
+    padding: var(--yt-spacing-5xl) var(--yt-spacing-2xl);
+    text-align: center;
+    color: var(--yt-text-tertiary);
+}
+
+.yt-spinner {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--yt-border-color);
+    border-top-color: var(--yt-color-primary);
+    border-radius: var(--yt-radius-full);
+    animation: yt-spin 1s linear infinite;
+    margin-bottom: var(--yt-spacing-xl);
+}
+
+.yt-warning {
+    color: var(--yt-color-error);
+    padding: var(--yt-spacing-xl);
+    text-align: center;
+}
+
+.yt-error {
+    color: var(--yt-color-error);
+    padding: var(--yt-spacing-xl);
+}
+
+/* Toasts */
+.yt-toast {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: var(--yt-z-panel);
+    background: var(--yt-bg-interactive);
+    color: var(--yt-text-primary);
+    border: 1px solid var(--yt-border-color);
+    border-radius: var(--yt-radius-md);
+    padding: 10px 14px;
+    box-shadow: var(--yt-shadow-md);
+    opacity: 0;
+    transform: translateY(8px);
+    transition:
+        opacity var(--yt-transition-fast),
+        transform var(--yt-transition-fast);
+    max-width: 360px;
+    font-size: var(--yt-font-size-base);
+}
+
+.yt-toast.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.yt-toast-error {
+    border-color: var(--yt-color-error);
+}
+
+.yt-toast-info {
+    border-color: var(--yt-color-primary);
+}

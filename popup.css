@@ -1,0 +1,282 @@
+@import url('./src/styles/tokens.css');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    width: 440px;
+    font-family: var(--yt-font-primary);
+    background: var(--yt-bg-primary);
+    color: var(--yt-text-primary);
+}
+
+.container {
+    padding: var(--yt-spacing-xl);
+}
+
+.main-action {
+    margin-bottom: var(--yt-spacing-xl);
+    padding-bottom: var(--yt-spacing-xl);
+    border-bottom: 1px solid var(--yt-border-color);
+}
+
+.primary-btn {
+    width: 100%;
+    padding: var(--yt-spacing-lg);
+    background: var(--yt-color-primary);
+    color: var(--yt-text-on-primary);
+    border: none;
+    border-radius: var(--yt-radius-lg);
+    font-size: var(--yt-font-size-xl);
+    font-weight: var(--yt-font-weight-semibold);
+    cursor: pointer;
+    transition: all var(--yt-transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--yt-spacing-md);
+}
+
+.primary-btn:hover {
+    background: var(--yt-color-primary-hover);
+    transform: translateY(-1px);
+}
+
+.primary-btn:active {
+    transform: translateY(0);
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--yt-spacing-xl);
+}
+
+.header h1 {
+    font-size: var(--yt-font-size-3xl);
+    font-weight: var(--yt-font-weight-semibold);
+}
+
+.version {
+    font-size: var(--yt-font-size-md);
+    color: var(--yt-text-quaternary);
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    margin-bottom: var(--yt-spacing-xl);
+    border-bottom: 1px solid var(--yt-border-color);
+}
+
+.tab-btn {
+    flex: 1;
+    padding: var(--yt-spacing-lg);
+    background: transparent;
+    border: none;
+    color: var(--yt-text-quaternary);
+    font-size: var(--yt-font-size-base);
+    font-weight: var(--yt-font-weight-medium);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all var(--yt-transition-fast);
+}
+
+.tab-btn:hover {
+    color: var(--yt-text-primary);
+    background: var(--yt-bg-interactive);
+}
+
+.tab-btn.active {
+    color: var(--yt-color-primary);
+    border-bottom-color: var(--yt-color-primary);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.provider-group {
+    background: var(--yt-bg-interactive);
+    border-radius: var(--yt-radius-lg);
+    padding: var(--yt-spacing-lg);
+    margin-bottom: var(--yt-spacing-xl);
+    border: 1px solid var(--yt-border-color-light);
+}
+
+.provider-group h3,
+.feature-config h3 {
+    font-size: var(--yt-font-size-lg);
+    font-weight: var(--yt-font-weight-semibold);
+    margin-bottom: var(--yt-spacing-lg);
+    color: var(--yt-text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--yt-spacing-md);
+}
+
+.feature-config {
+    background: var(--yt-bg-interactive);
+    border-radius: var(--yt-radius-lg);
+    padding: var(--yt-spacing-lg);
+    margin-bottom: var(--yt-spacing-xl);
+    border: 1px solid var(--yt-border-color-light);
+}
+
+.section {
+    margin-bottom: var(--yt-spacing-xl);
+}
+
+.section:last-child {
+    margin-bottom: 0;
+}
+
+.section label {
+    display: block;
+    font-size: var(--yt-font-size-md);
+    font-weight: var(--yt-font-weight-medium);
+    margin-bottom: var(--yt-spacing-sm);
+    color: var(--yt-text-secondary);
+}
+
+.section input[type='text'],
+.section input[type='password'],
+.section input[type='number'] {
+    width: 100%;
+    padding: var(--yt-spacing-md) var(--yt-spacing-lg);
+    background: var(--yt-bg-overlay-dark);
+    border: 1px solid var(--yt-border-color);
+    border-radius: var(--yt-radius-lg);
+    color: var(--yt-text-primary);
+    font-size: var(--yt-font-size-base);
+    outline: none;
+    transition: border-color var(--yt-transition-fast);
+}
+
+.section input:focus,
+.section select:focus {
+    border-color: var(--yt-color-primary);
+}
+
+.section select {
+    width: 100%;
+    padding: var(--yt-spacing-md) var(--yt-spacing-lg);
+    background-color: var(--yt-bg-overlay-dark);
+    border: 1px solid var(--yt-border-color);
+    border-radius: var(--yt-radius-lg);
+    color: var(--yt-text-primary);
+    font-size: var(--yt-font-size-base);
+    outline: none;
+    cursor: pointer;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: var(--yt-spacing-md);
+    cursor: pointer;
+    font-size: var(--yt-font-size-base);
+    font-weight: var(--yt-font-weight-medium);
+    color: var(--yt-text-primary);
+}
+
+.checkbox-label input[type='checkbox'] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--yt-color-primary);
+}
+
+.range-container {
+    display: flex;
+    align-items: center;
+}
+
+.range-container input[type='range'] {
+    flex: 1;
+    margin-right: var(--yt-spacing-lg);
+}
+
+.range-container span {
+    font-size: var(--yt-font-size-base);
+    color: var(--yt-text-tertiary);
+    min-width: 30px;
+}
+
+.hint {
+    font-size: var(--yt-font-size-sm);
+    color: var(--yt-text-quaternary);
+    margin-top: var(--yt-spacing-sm);
+}
+
+.hint a {
+    color: var(--yt-color-primary);
+    text-decoration: none;
+}
+
+.buttons {
+    display: flex;
+    gap: var(--yt-spacing-lg);
+    margin-top: var(--yt-spacing-2xl);
+}
+
+.save-btn,
+.clear-btn {
+    flex: 1;
+    padding: var(--yt-spacing-lg);
+    border: none;
+    border-radius: var(--yt-radius-lg);
+    font-size: var(--yt-font-size-base);
+    font-weight: var(--yt-font-weight-medium);
+    cursor: pointer;
+}
+
+.save-btn {
+    background: var(--yt-color-primary);
+    color: var(--yt-text-on-primary);
+}
+
+.save-btn:hover {
+    background: var(--yt-color-primary-hover);
+}
+
+.clear-btn {
+    background: var(--yt-bg-interactive);
+    color: var(--yt-text-primary);
+}
+
+.clear-btn:hover {
+    background: var(--yt-bg-interactive-active);
+}
+
+.status {
+    text-align: center;
+    font-size: var(--yt-font-size-md);
+    margin-top: var(--yt-spacing-lg);
+    min-height: 18px;
+}
+
+.status.success {
+    color: var(--yt-color-success);
+}
+
+.advanced-config {
+    margin-top: var(--yt-spacing-xl);
+    padding-top: var(--yt-spacing-lg);
+    border-top: 1px solid var(--yt-border-color-light);
+}
+
+.advanced-config h4 {
+    font-size: var(--yt-font-size-md);
+    font-weight: var(--yt-font-weight-semibold);
+    margin-bottom: var(--yt-spacing-lg);
+    color: var(--yt-text-secondary);
+}

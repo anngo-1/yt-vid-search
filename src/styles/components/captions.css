@@ -1,0 +1,155 @@
+.yt-caption-overlay {
+    position: fixed;
+    z-index: var(--yt-z-captions);
+    cursor: move;
+    background: var(--yt-bg-overlay);
+    padding: 0;
+    border-radius: var(--yt-radius-xl);
+    max-width: var(--yt-caption-max-width);
+    min-width: var(--yt-caption-min-width);
+    width: auto;
+    /* Height is always auto - adapts to content */
+    height: auto;
+    min-height: var(--yt-caption-min-height);
+    text-align: center;
+    pointer-events: auto;
+    user-select: none;
+    transition:
+        opacity var(--yt-transition-fast),
+        background var(--yt-transition-fast);
+    backdrop-filter: blur(10px);
+    box-sizing: border-box;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    /* Allow content to expand - never clip text */
+    overflow: visible;
+    border: 1px solid var(--yt-border-color);
+    box-shadow: var(--yt-shadow-md);
+}
+
+/* When background is transparent, enhance text shadow for readability */
+.yt-caption-overlay.yt-caption-transparent {
+    backdrop-filter: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* When user has manually resized, allow height to grow for content */
+.yt-caption-overlay.yt-caption-resized {
+    /* If width is set manually, ensure height can still grow */
+    height: auto;
+    max-height: none;
+}
+
+.yt-caption-text {
+    color: var(--yt-text-primary);
+    font-size: var(--yt-caption-font-size);
+    font-weight: var(--yt-font-weight-bold);
+    pointer-events: none;
+    text-shadow: var(--yt-shadow-text);
+    /* No -webkit-text-stroke - soft shadows only for anime-style look */
+    font-family: var(--yt-font-youtube);
+    line-height: var(--yt-line-height-tight);
+    width: 100%;
+    flex-shrink: 0;
+    /* Ensure text wraps properly and doesn't overflow */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+    hyphens: auto;
+    /* Prevent text from being cut off */
+    overflow: visible;
+    /* Ensure text takes up space */
+    min-width: 0;
+}
+
+.yt-text-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: var(--yt-spacing-md);
+    width: 100%;
+    align-items: center;
+    padding: var(--yt-spacing-3xl) var(--yt-spacing-4xl);
+    box-sizing: border-box;
+    justify-content: center;
+    /* Remove min-height: 0 to allow content to determine size */
+    min-height: var(--yt-caption-min-height);
+    /* Ensure content can expand the container */
+    flex: 0 1 auto;
+}
+
+.yt-caption-resize {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: var(--yt-spacing-2xl);
+    height: var(--yt-spacing-2xl);
+    /* Only resize width - height is always auto */
+    cursor: ew-resize;
+    background: transparent;
+    border-radius: 0 0 var(--yt-radius-md) 0;
+    /* Make resize handle more visible and easier to grab */
+    z-index: 1;
+}
+
+.yt-caption-resize:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Visual indicator for resize handle */
+.yt-caption-resize::after {
+    content: '';
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 0 8px 8px;
+    border-color: transparent transparent rgba(255, 255, 255, 0.3) transparent;
+}
+
+.yt-translated-text {
+    font-size: var(--yt-font-size-base);
+    color: var(--yt-text-tertiary);
+    margin-top: var(--yt-spacing-sm);
+    font-style: italic;
+    border-top: 1px ridge var(--yt-border-color-light);
+    padding-top: var(--yt-spacing-sm);
+}
+
+.yt-caption-overlay .yt-translated-text {
+    font-size: var(--yt-caption-translation-font-size);
+    color: var(--yt-color-warning);
+    font-weight: var(--yt-font-weight-medium);
+    font-style: normal;
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
+    text-shadow: var(--yt-shadow-text-light);
+    width: 100%;
+    flex-shrink: 0;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: var(--yt-line-height-tight);
+    white-space: normal;
+    hyphens: auto;
+    /* Ensure translated text doesn't get cut off */
+    overflow: visible;
+    min-width: 0;
+}
+
+.yt-caption-overlay .yt-translated-text.is-main {
+    font-size: var(--yt-caption-font-size-main);
+    color: var(--yt-text-primary);
+    font-weight: var(--yt-font-weight-bold);
+    margin-top: 0;
+    text-shadow: var(--yt-shadow-text);
+}
+
+#yt-caption-btn.active {
+    background: var(--yt-color-primary-medium);
+    border-radius: var(--yt-radius-md);
+    opacity: 1;
+}

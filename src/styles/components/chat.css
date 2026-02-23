@@ -1,0 +1,308 @@
+/**
+ * Chat Component
+ * Chat interface styles
+ */
+
+/* Ask tab header */
+.yt-ask-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--yt-spacing-md) var(--yt-spacing-xl);
+    border-bottom: 1px solid var(--yt-border-color-light);
+    flex-shrink: 0;
+}
+
+.yt-link-btn {
+    background: none;
+    border: none;
+    color: var(--yt-text-tertiary);
+    font-size: var(--yt-font-size-md);
+    cursor: pointer;
+    padding: var(--yt-spacing-sm) var(--yt-spacing-md);
+    border-radius: var(--yt-radius-md);
+    transition:
+        color 0.15s,
+        background 0.15s;
+}
+
+.yt-link-btn:hover {
+    color: var(--yt-text-primary);
+    background: var(--yt-bg-interactive);
+}
+
+/* Chat messages */
+.yt-chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--yt-spacing-xl);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Ask bar (input + send button) */
+.yt-ask-bar {
+    padding: var(--yt-spacing-lg);
+    border-top: 1px solid var(--yt-border-color);
+    display: flex;
+    align-items: center;
+    gap: var(--yt-spacing-md);
+    flex-shrink: 0;
+}
+
+.yt-ask-bar .yt-input {
+    flex: 1;
+    padding: var(--yt-spacing-md) var(--yt-spacing-lg);
+    font-size: var(--yt-font-size-base);
+}
+
+#yt-ask-send {
+    background: var(--yt-color-primary);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--yt-text-on-primary);
+    transition: opacity 0.15s;
+}
+
+#yt-ask-send.yt-stop {
+    background: var(--yt-bg-interactive);
+}
+
+#yt-ask-send:hover {
+    opacity: 0.85;
+}
+
+#yt-ask-send svg {
+    width: 16px;
+    height: 16px;
+}
+
+.yt-message {
+    max-width: 85%;
+    margin-bottom: var(--yt-spacing-lg);
+    padding: var(--yt-spacing-lg) var(--yt-spacing-xl);
+    border-radius: var(--yt-radius-2xl);
+    font-size: var(--yt-font-size-base);
+    /* Slightly smaller base for chat readability */
+    line-height: var(--yt-line-height-relaxed);
+    word-wrap: break-word;
+}
+
+.yt-message-user {
+    align-self: flex-end;
+    background: var(--yt-color-primary);
+    color: var(--yt-text-on-primary);
+    border-radius: var(--yt-radius-2xl) var(--yt-radius-2xl) var(--yt-radius-sm) var(--yt-radius-2xl);
+}
+
+.yt-message-assistant {
+    align-self: flex-start;
+    background: var(--yt-bg-interactive);
+    color: var(--yt-text-primary);
+    border-radius: var(--yt-radius-2xl) var(--yt-radius-2xl) var(--yt-radius-2xl) var(--yt-radius-sm);
+}
+
+.yt-message-system {
+    color: var(--yt-color-error);
+    padding: var(--yt-spacing-md);
+    font-style: italic;
+    align-self: center;
+    text-align: center;
+    max-width: 100%;
+}
+
+.yt-loading-msg {
+    color: var(--yt-text-tertiary);
+    font-style: italic;
+    padding: var(--yt-spacing-md);
+    margin-bottom: var(--yt-spacing-md);
+}
+
+/* --- Markdown Styles --- */
+
+.yt-message p {
+    margin: 0 0 0.8em 0;
+}
+
+.yt-message p:last-child {
+    margin-bottom: 0;
+}
+
+.yt-message strong {
+    font-weight: var(--yt-font-weight-bold);
+}
+
+.yt-message em {
+    font-style: italic;
+}
+
+.yt-message ul,
+.yt-message ol {
+    margin: 0 0 0.8em 1.5em;
+    padding: 0;
+}
+
+.yt-message li {
+    margin-bottom: var(--yt-spacing-sm);
+}
+
+.yt-message h1,
+.yt-message h2,
+.yt-message h3,
+.yt-message h4 {
+    font-weight: var(--yt-font-weight-bold);
+    margin: 1em 0 0.5em 0;
+    line-height: var(--yt-line-height-tight);
+}
+
+.yt-message h1:first-child,
+.yt-message h2:first-child,
+.yt-message h3:first-child {
+    margin-top: 0;
+}
+
+.yt-message h1 {
+    font-size: 1.4em;
+}
+
+.yt-message h2 {
+    font-size: 1.3em;
+}
+
+.yt-message h3 {
+    font-size: 1.2em;
+}
+
+.yt-message h4 {
+    font-size: 1.1em;
+}
+
+.yt-message blockquote {
+    border-left: 3px solid var(--yt-color-primary);
+    margin: 0 0 1em 0;
+    color: var(--yt-text-secondary);
+    font-style: italic;
+    background: var(--yt-bg-interactive);
+    padding: var(--yt-spacing-md) var(--yt-spacing-lg);
+    border-radius: 0 var(--yt-radius-md) var(--yt-radius-md) 0;
+}
+
+.yt-message a {
+    color: var(--yt-color-primary);
+    text-decoration: none;
+}
+
+.yt-message a:hover {
+    text-decoration: underline;
+}
+
+/* Timestamps */
+.yt-timestamp {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--yt-color-primary);
+    font-weight: bold;
+    font-size: inherit;
+    cursor: pointer;
+}
+
+/* Code Blocks */
+.yt-message pre {
+    background: rgba(0, 0, 0, 0.3);
+    padding: var(--yt-spacing-lg);
+    border-radius: var(--yt-radius-lg);
+    margin: 0.8em 0;
+    overflow-x: auto;
+    font-family: var(--yt-font-mono);
+    font-size: 0.9em;
+    border: 1px solid var(--yt-border-color);
+}
+
+.yt-message code {
+    font-family: var(--yt-font-mono);
+    font-size: 0.9em;
+    background: rgba(0, 0, 0, 0.3);
+    padding: var(--yt-spacing-xs) var(--yt-spacing-sm);
+    border-radius: var(--yt-radius-md);
+}
+
+.yt-message pre code {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    color: var(--yt-text-secondary);
+}
+
+/* Tables */
+.yt-message table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.8em 0;
+    font-size: 0.9em;
+}
+
+.yt-message th,
+.yt-message td {
+    border: 1px solid var(--yt-border-color-medium);
+    padding: var(--yt-spacing-md) var(--yt-spacing-lg);
+    text-align: left;
+}
+
+.yt-message th {
+    background: rgba(255, 255, 255, 0.05);
+    font-weight: var(--yt-font-weight-semibold);
+}
+
+.yt-message tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Typing Indicator */
+.yt-typing-indicator {
+    display: inline-flex;
+    gap: var(--yt-spacing-sm);
+    padding: var(--yt-spacing-sm) 0;
+}
+
+.yt-typing-indicator span {
+    width: 6px;
+    height: 6px;
+    background: var(--yt-text-tertiary);
+    border-radius: 50%;
+    animation: typing-bounce 1.4s infinite ease-in-out both;
+}
+
+.yt-typing-indicator span:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.yt-typing-indicator span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.yt-typing-indicator span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typing-bounce {
+    0%,
+    80%,
+    100% {
+        transform: scale(0.6);
+        opacity: 0.4;
+    }
+
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}

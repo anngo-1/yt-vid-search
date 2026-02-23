@@ -1,0 +1,25 @@
+/**
+ * Content Styles - Main Entry Point
+ * 
+ * This file imports all CSS modules in the correct order:
+ * 1. Design tokens (variables)
+ * 2. Base styles (animations, utilities)
+ * 3. Component styles
+ * 
+ * Vite will bundle this into a single CSS file during build.
+ */
+
+/* Design Tokens - Must be imported first */
+@import './tokens.css';
+
+/* Base Styles */
+@import './base.css';
+
+/* Component Styles */
+@import './components/panel.css';
+@import './components/tabs.css';
+@import './components/transcript.css';
+@import './components/chat.css';
+@import './components/topics.css';
+@import './components/captions.css';
+@import './components/controls.css';

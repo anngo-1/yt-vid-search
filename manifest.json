@@ -1,0 +1,28 @@
+{
+    "manifest_version": 3,
+    "name": "Ask Transcript",
+    "description": "Search transcripts, ask questions, and auto-generate topic outlines for YouTube videos",
+    "version": "3.5.0",
+    "permissions": ["storage"],
+    "host_permissions": [
+        "*://www.youtube.com/*",
+        "https://openrouter.ai/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+    ],
+    "action": {
+        "default_popup": "popup.html",
+        "default_title": "Ask Transcript Settings"
+    },
+    "background": {
+        "service_worker": "src/background.js",
+        "type": "module"
+    },
+    "content_scripts": [
+        {
+            "matches": ["*://www.youtube.com/*"],
+            "js": ["src/main.js"],
+            "run_at": "document_end"
+        }
+    ]
+}

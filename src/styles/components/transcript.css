@@ -1,0 +1,65 @@
+/**
+ * Transcript Component
+ * Transcript view and row styles
+ */
+
+#yt-transcript-view {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#yt-transcript-rows {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.yt-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--yt-spacing-sm);
+    padding: var(--yt-spacing-lg) var(--yt-spacing-xl);
+    border-bottom: 1px solid var(--yt-border-color);
+    cursor: pointer;
+}
+
+.yt-row:hover {
+    background: var(--yt-bg-interactive);
+}
+
+.yt-row.active {
+    background: var(--yt-color-primary-light);
+    border-left: 2px solid var(--yt-color-primary);
+}
+
+.yt-row.active .yt-time {
+    color: var(--yt-text-primary);
+}
+
+.yt-time {
+    color: var(--yt-color-primary);
+    font-weight: var(--yt-font-weight-medium);
+    font-size: var(--yt-font-size-md);
+}
+
+.yt-text {
+    font-size: var(--yt-font-size-lg);
+    line-height: var(--yt-line-height-normal);
+    color: var(--yt-text-primary);
+}
+
+.yt-text mark {
+    background: var(--yt-color-primary);
+    color: var(--yt-text-on-primary);
+    padding: 1px var(--yt-spacing-xs);
+    border-radius: var(--yt-spacing-xs);
+}
+
+.yt-transcript-controls {
+    padding: var(--yt-spacing-md) var(--yt-spacing-xl);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--yt-border-color);
+    background: var(--yt-bg-overlay-dark);
+}

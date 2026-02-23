@@ -1,0 +1,31 @@
+/**
+ * Tabs Component
+ * Tab navigation styles
+ */
+
+.yt-tab-bar {
+    display: flex;
+    gap: var(--yt-spacing-md);
+    padding: var(--yt-spacing-md) var(--yt-spacing-xl);
+    border-bottom: 1px solid var(--yt-border-color);
+}
+
+.yt-tab-bar > * {
+    flex-shrink: 0;
+}
+
+.yt-tab {
+    padding: var(--yt-spacing-md) var(--yt-spacing-xl);
+    border: none;
+    border-radius: var(--yt-radius-2xl);
+    font-size: var(--yt-font-size-lg);
+    font-weight: var(--yt-font-weight-medium);
+    cursor: pointer;
+    background: transparent;
+    color: var(--yt-text-tertiary);
+}
+
+.yt-tab.active {
+    background: var(--yt-bg-interactive);
+    color: var(--yt-text-primary);
+}

@@ -1,0 +1,65 @@
+/**
+ * Panel Component
+ * Main container and layout styles
+ */
+
+.yt-panel {
+    position: fixed;
+    top: var(--yt-panel-top);
+    right: var(--yt-panel-right);
+    width: var(--yt-panel-width);
+    min-width: var(--yt-panel-min-width);
+    height: var(--yt-panel-max-height);
+    max-height: var(--yt-panel-max-height);
+    min-height: var(--yt-panel-min-height);
+    resize: both;
+    overflow: hidden;
+    background: var(--yt-bg-primary);
+    border-radius: var(--yt-radius-xl);
+    box-shadow: var(--yt-shadow-lg);
+    z-index: var(--yt-z-panel);
+    display: flex;
+    flex-direction: column;
+    font-family: var(--yt-font-primary);
+}
+
+.yt-panel-header {
+    display: flex;
+    align-items: center;
+    padding: var(--yt-spacing-lg) var(--yt-spacing-xl);
+    border-bottom: 1px solid var(--yt-border-color);
+    gap: var(--yt-spacing-md);
+    cursor: grab;
+    user-select: none;
+}
+
+.yt-panel-title {
+    font-size: var(--yt-font-size-2xl);
+    font-weight: var(--yt-font-weight-medium);
+    color: var(--yt-text-primary);
+}
+
+.yt-token-count {
+    font-size: var(--yt-font-size-sm);
+    color: var(--yt-text-quaternary);
+    margin-left: var(--yt-spacing-md);
+}
+
+.yt-content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.yt-view {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.yt-view.active {
+    display: flex;
+}

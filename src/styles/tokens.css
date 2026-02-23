@@ -1,0 +1,132 @@
+/**
+ * Design Tokens
+ * Single source of truth for colors, spacing, typography, and other design values
+ */
+
+:root {
+    /* Colors - Primary */
+    --yt-color-primary: #3ea6ff;
+    --yt-color-primary-hover: #65b8ff;
+    --yt-color-primary-light: rgba(62, 166, 255, 0.1);
+    --yt-color-primary-medium: rgba(62, 166, 255, 0.2);
+    --yt-color-primary-dark: rgba(62, 166, 255, 0.3);
+
+    /* Colors - Background */
+    --yt-bg-primary: #212121;
+    --yt-bg-secondary: #282828;
+    --yt-bg-overlay: rgba(0, 0, 0, 0.75);
+    --yt-bg-overlay-light: rgba(0, 0, 0, 0.3);
+    --yt-bg-overlay-dark: rgba(0, 0, 0, 0.1);
+
+    /* Colors - Text */
+    --yt-text-primary: #fff;
+    --yt-text-secondary: #ccc;
+    --yt-text-tertiary: #aaa;
+    --yt-text-quaternary: #888;
+    --yt-text-on-primary: #000;
+
+    /* Colors - Borders */
+    --yt-border-color: rgba(255, 255, 255, 0.1);
+    --yt-border-color-light: rgba(255, 255, 255, 0.05);
+    --yt-border-color-medium: rgba(255, 255, 255, 0.2);
+
+    /* Colors - States */
+    --yt-color-error: #ff6b6b;
+    --yt-color-error-light: rgba(255, 107, 107, 0.1);
+    --yt-color-error-medium: rgba(255, 107, 107, 0.3);
+    --yt-color-warning: #ffcc00;
+    --yt-color-success: #4caf50;
+
+    /* Colors - Interactive */
+    --yt-bg-interactive: rgba(255, 255, 255, 0.05);
+    --yt-bg-interactive-hover: rgba(255, 255, 255, 0.1);
+    --yt-bg-interactive-active: rgba(255, 255, 255, 0.15);
+
+    /* Spacing */
+    --yt-spacing-xs: 2px;
+    --yt-spacing-sm: 4px;
+    --yt-spacing-md: 8px;
+    --yt-spacing-lg: 12px;
+    --yt-spacing-xl: 16px;
+    --yt-spacing-2xl: 20px;
+    --yt-spacing-3xl: 24px;
+    --yt-spacing-4xl: 30px;
+    --yt-spacing-5xl: 40px;
+
+    /* Border Radius */
+    --yt-radius-sm: 3px;
+    --yt-radius-md: 4px;
+    --yt-radius-lg: 8px;
+    --yt-radius-xl: 12px;
+    --yt-radius-2xl: 18px;
+    --yt-radius-full: 50%;
+
+    /* Typography - Font Families */
+    --yt-font-primary: Roboto, Arial, sans-serif;
+    --yt-font-youtube: 'YouTube Sans', Roboto, Arial, sans-serif;
+    --yt-font-mono: monospace;
+
+    /* Typography - Font Sizes */
+    --yt-font-size-xs: 10px;
+    --yt-font-size-sm: 11px;
+    --yt-font-size-md: 12px;
+    --yt-font-size-base: 13px;
+    --yt-font-size-lg: 14px;
+    --yt-font-size-xl: 15px;
+    --yt-font-size-2xl: 16px;
+    --yt-font-size-3xl: 20px;
+    --yt-font-size-4xl: 24px;
+
+    /* Typography - Font Weights */
+    --yt-font-weight-normal: 400;
+    --yt-font-weight-medium: 500;
+    --yt-font-weight-semibold: 600;
+    --yt-font-weight-bold: 700;
+
+    /* Typography - Line Heights */
+    --yt-line-height-tight: 1.4;
+    --yt-line-height-normal: 1.5;
+    --yt-line-height-relaxed: 1.6;
+
+    /* Shadows */
+    --yt-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+    --yt-shadow-md: 0 4px 20px rgba(0, 0, 0, 0.5);
+    --yt-shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.4);
+    /* Anime-style soft outline using layered blurred shadows */
+    --yt-shadow-text:
+        /* Core outline - tight, slightly blurred for smoothness */
+        0 0 2px #000, 0 0 2px #000, 0 0 2px #000, /* Directional shadows for depth */ 1px 1px 2px #000,
+        -1px -1px 2px #000, 1px -1px 2px #000, -1px 1px 2px #000,
+        /* Soft glow layer for readability on any background */ 0 0 8px rgba(0, 0, 0, 0.9), 0 0 16px rgba(0, 0, 0, 0.5);
+    --yt-shadow-text-light: 2px 2px 4px rgba(0, 0, 0, 0.8);
+
+    /* Z-Index Layers */
+    --yt-z-base: 1;
+    --yt-z-dropdown: 10;
+    --yt-z-sticky: 19;
+    --yt-z-toolbar: 20;
+    --yt-z-panel: 2500;
+    --yt-z-captions: 2147483647;
+
+    /* Transitions */
+    --yt-transition-fast: 0.2s;
+    --yt-transition-normal: 0.3s;
+    --yt-transition-slow: 4s;
+
+    /* Panel Dimensions */
+    --yt-panel-width: 380px;
+    --yt-panel-min-width: 280px;
+    --yt-panel-max-width: 600px;
+    --yt-panel-min-height: 200px;
+    --yt-panel-top: 70px;
+    --yt-panel-right: 20px;
+    --yt-panel-max-height: calc(100vh - 100px);
+
+    /* Caption Overlay */
+    --yt-caption-max-width: 90%;
+    --yt-caption-min-width: 600px;
+    --yt-caption-min-height: 80px;
+    --yt-caption-font-size: 48px;
+
+    --yt-caption-translation-font-size: 40px;
+}
