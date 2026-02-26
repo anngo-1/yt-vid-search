@@ -3,7 +3,7 @@
  * All requests are proxied through the background script to avoid CORS issues
  */
 
-import type { Settings, ChatMessage } from '@/types';
+import type { Settings, ChatMessage, Tool, ToolCall } from '@/types';
 import { resolveProvider, resolveModel, type ApiFeature } from '@/utils/llm';
 import { ApiError } from '@/services/errors';
 import { isApiResponse } from '@/services/validators';
@@ -93,9 +93,15 @@ interface StreamOptions {
     messages: ChatMessage[];
     settings: Settings;
     onChunk: (text: string) => void;
+    tools?: Tool[];
     temperature?: number;
     feature?: ApiFeature;
     signal?: AbortSignal;
+}
+
+export interface StreamCompletionResult {
+    content: string;
+    tool_calls?: ToolCall[];
 }
 
 /** stream response from LLM provider via background script, returns full response when complete */
@@ -103,10 +109,11 @@ export async function streamCompletion({
     messages,
     settings,
     onChunk,
+    tools,
     temperature,
     feature,
     signal,
-}: StreamOptions): Promise<string> {
+}: StreamOptions): Promise<StreamCompletionResult> {
     validateSettings(settings, feature);
 
     const streamKey = feature || 'default';
@@ -120,12 +127,16 @@ export async function streamCompletion({
     const headers = getHeaders(settings, feature);
     const model = resolveModel(settings, feature);
 
-    const body = JSON.stringify({
+    const bodyObj: any = {
         model,
         messages,
         temperature: temperature ?? settings.temperature ?? DEFAULT_TEMP,
         stream: true,
-    });
+    };
+    if (tools && tools.length > 0) {
+        bodyObj.tools = tools;
+    }
+    const body = JSON.stringify(bodyObj);
 
     return new Promise((resolve, reject) => {
         const port = chrome.runtime.connect(undefined, { name: 'api-stream' });
@@ -133,6 +144,12 @@ export async function streamCompletion({
         let buffer = '';
         let eventData: string[] = [];
         let result = '';
+        const toolCalls = new Map<number, ToolCall>();
+
+        const getFinalResult = (): StreamCompletionResult => ({
+            content: result,
+            tool_calls: toolCalls.size > 0 ? Array.from(toolCalls.values()) : undefined
+        });
 
         /** Process SSE events from buffer, returning true if stream is done */
         const processBuffer = (extraData?: string): boolean => {
@@ -143,10 +160,41 @@ export async function streamCompletion({
 
             for (const event of parsed.events) {
                 if (event === '[DONE]') return true;
-                const content = parseSSEData(event);
-                if (content) {
-                    result += content;
-                    onChunk(content);
+                const parsedData = parseSSEData(event);
+                if (parsedData) {
+                    if (parsedData.error) {
+                        throw new ApiError(parsedData.error);
+                    }
+                    if (parsedData.content === '[DONE]') return true;
+                    if (parsedData.content) {
+                        result += parsedData.content;
+                        onChunk(parsedData.content);
+                    }
+                    if (parsedData.tool_calls) {
+                        for (const tc of parsedData.tool_calls) {
+                            const index = tc.index ?? toolCalls.size;
+                            if (!toolCalls.has(index)) {
+                                toolCalls.set(index, {
+                                    id: tc.id || '',
+                                    type: 'function',
+                                    function: {
+                                        name: tc.function?.name || '',
+                                        arguments: tc.function?.arguments || ''
+                                    }
+                                });
+                            } else {
+                                const existing = toolCalls.get(index)!;
+                                if (tc.id) existing.id = tc.id;
+                                if (tc.type) existing.type = tc.type;
+                                if (tc.function?.name) {
+                                    existing.function.name += tc.function.name;
+                                }
+                                if (tc.function?.arguments) {
+                                    existing.function.arguments += tc.function.arguments;
+                                }
+                            }
+                        }
+                    }
                 }
             }
             return false;
@@ -162,7 +210,7 @@ export async function streamCompletion({
                 'abort',
                 () => {
                     cleanup();
-                    resolve(result);
+                    resolve(getFinalResult());
                 },
                 { once: true },
             );
@@ -175,19 +223,24 @@ export async function streamCompletion({
             }
             if (!isPortMessage(message)) return;
 
-            if (message.type === 'chunk') {
-                if (processBuffer(message.data || '')) {
+            try {
+                if (message.type === 'chunk') {
+                    if (processBuffer(message.data || '')) {
+                        cleanup();
+                        resolve(getFinalResult());
+                    }
+                } else if (message.type === 'done') {
+                    processBuffer();
                     cleanup();
-                    resolve(result);
+                    resolve(getFinalResult());
+                } else if (message.type === 'error') {
+                    cleanup();
+                    const errorMsg = tryParseError(message.error || '') || message.error || 'Unknown error';
+                    reject(new ApiError(errorMsg));
                 }
-            } else if (message.type === 'done') {
-                processBuffer();
+            } catch (err) {
                 cleanup();
-                resolve(result);
-            } else if (message.type === 'error') {
-                cleanup();
-                const errorMsg = tryParseError(message.error || '') || message.error || 'Unknown error';
-                reject(new ApiError(errorMsg));
+                reject(err instanceof Error ? err : new Error(String(err)));
             }
         });
 
@@ -319,14 +372,28 @@ export function extractSSEEvents(
     return { events, rest, eventData };
 }
 
+export interface ParsedSSEData {
+    content?: string;
+    tool_calls?: any[];
+    error?: string;
+}
+
 /** Parse a single SSE event data string into content text */
-export function parseSSEData(data: string): string | null {
+export function parseSSEData(data: string): ParsedSSEData | null {
     if (!data) return null;
-    if (data.trim() === '[DONE]') return '[DONE]';
+    if (data.trim() === '[DONE]') return { content: '[DONE]' };
 
     try {
         const parsed = JSON.parse(data);
-        return parsed.choices?.[0]?.delta?.content || null;
+        if (parsed.error) {
+            return { error: parsed.error.message || JSON.stringify(parsed.error) };
+        }
+        const delta = parsed.choices?.[0]?.delta;
+        if (!delta) return null;
+        return {
+            content: delta.content || undefined,
+            tool_calls: delta.tool_calls || undefined
+        };
     } catch {
         return null;
     }

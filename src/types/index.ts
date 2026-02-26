@@ -32,6 +32,7 @@ export interface Settings {
     custom_model?: string; // Default custom model
     // Chat settings
     fast_followups?: boolean; // Only send transcript on first message
+    chat_direct_mode?: boolean; // Skip tools, always include full transcript in prompt
     // Topics settings
     auto_generate_topics?: boolean; // Automatically generate topics when panel opens
 
@@ -41,9 +42,36 @@ export interface Settings {
     translation_max_concurrent?: number;
 }
 
+export interface FunctionCall {
+    name: string;
+    arguments: string; // JSON string
+}
+
+export interface ToolCall {
+    id: string;
+    type: 'function';
+    function: FunctionCall;
+}
+
+export interface Tool {
+    type: 'function';
+    function: {
+        name: string;
+        description: string;
+        parameters: {
+            type: string;
+            properties: Record<string, any>;
+            required?: string[];
+        };
+    };
+}
+
 export interface ChatMessage {
-    role: 'user' | 'assistant' | 'system';
-    content: string;
+    role: 'user' | 'assistant' | 'system' | 'tool';
+    content: string | null;
+    tool_calls?: ToolCall[];
+    tool_call_id?: string;
+    name?: string;
 }
 
 // --- Transcript types ---

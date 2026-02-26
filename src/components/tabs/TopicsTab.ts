@@ -98,8 +98,8 @@ export class TopicsTab extends Component {
           </div>
           <div class="yt-subtopics" id="subtopics-${i}">
             ${(topic.subtopics || [])
-                .map(
-                    (sub) => `
+                        .map(
+                            (sub) => `
               <div class="yt-subtopic">
                 <span class="yt-bullet">●</span>
                 <div class="yt-subtopic-content">
@@ -107,8 +107,8 @@ export class TopicsTab extends Component {
                   <span class="yt-subtopic-time" data-ts="${escapeHtml(sub.timestamp)}">${escapeHtml(sub.timestamp)}</span>
                 </div>
               </div>`,
-                )
-                .join('')}
+                        )
+                        .join('')}
           </div>
         </div>`,
             )
@@ -185,7 +185,7 @@ export class TopicsTab extends Component {
                 },
             });
 
-            const topicsData = parseResponse(response);
+            const topicsData = parseResponse(response.content);
             store.set('topicsData', topicsData);
             store.set('topicsVideoId', state.currentVideoId);
             this.renderTopics(topicsData);

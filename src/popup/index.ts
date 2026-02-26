@@ -32,6 +32,7 @@ const SETTING_FIELDS: SettingConfig[] = [
 
     // Flags
     { id: 'fastFollowups', key: 'fast_followups', type: 'checkbox', default: false },
+    { id: 'chatDirectMode', key: 'chat_direct_mode', type: 'checkbox', default: false },
     { id: 'autoGenerateTopics', key: 'auto_generate_topics', type: 'checkbox', default: undefined }, // undefined handled specially
 
     // Advanced Translation

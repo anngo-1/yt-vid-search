@@ -14,6 +14,13 @@ interface TimestampToken {
     seconds: number; // The parsed seconds
 }
 
+// Pre-compiled timestamp regexes — must be outside tokenizer() or they're rebuilt on every call
+const _timePattern = '\\d{1,2}:\\d{2}(?::\\d{2})?';
+const _sep = '\\s*(?:to|-|–|—|\\u2011)\\s*';
+const TS_BRACKET = new RegExp(`^\\[(${_timePattern}(?:${_sep}${_timePattern})?)\\]`);
+const TS_AT = new RegExp(`^(?:at|around|~|about|from)\\s+(${_timePattern}(?:${_sep}${_timePattern})?)`, 'i');
+const TS_RANGE = new RegExp(`^(${_timePattern}${_sep}${_timePattern})`);
+
 // Configure Marked
 marked.use({
     gfm: true,
@@ -40,63 +47,24 @@ const timestampExtension: TokenizerAndRendererExtension = {
         return src.match(/[[\d]|at|from/i)?.index;
     },
     tokenizer(src: string) {
-        // Regex for time format: M:SS or MM:SS or H:MM:SS
-        const timePattern = '\\d{1,2}:\\d{2}(?::\\d{2})?';
-
-        // Common separators (including non-breaking hyphen \u2011)
-        const separator = '\\s*(?:to|-|–|—|\\u2011)\\s*';
-
-        // 1. Bracketed: [1:30] or [1:30-2:00]
-        const bracketRegex = new RegExp(`^\\[(${timePattern}(?:${separator}${timePattern})?)\\]`);
-
-        // 2. "At" style: at 1:30
-        const atRegex = new RegExp(
-            `^(?:at|around|~|about|from)\\s+(${timePattern}(?:${separator}${timePattern})?)`,
-            'i',
-        );
-
-        // 3. Plain Range style: 0:00-0:30 or 0:00 - 0:30
-        // Must start with a number.
-        const rangeRegex = new RegExp(`^(${timePattern}${separator}${timePattern})`);
-
-        let match = bracketRegex.exec(src);
+        let match = TS_BRACKET.exec(src);
         if (match) {
             const display = match[1];
             const firstTime = (display.match(/\d{1,2}:\d{2}:\d{2}/) || display.match(/\d{1,2}:\d{2}/))?.[0] || '0:00';
-
-            return {
-                type: 'timestamp',
-                raw: match[0],
-                text: match[0],
-                seconds: timeToSeconds(firstTime),
-            } as TimestampToken;
+            return { type: 'timestamp', raw: match[0], text: match[0], seconds: timeToSeconds(firstTime) } as TimestampToken;
         }
 
-        match = atRegex.exec(src);
+        match = TS_AT.exec(src);
         if (match) {
-            const display = match[0];
-            const timePart = match[1];
-            const firstTime = (timePart.match(/\d{1,2}:\d{2}:\d{2}/) || timePart.match(/\d{1,2}:\d{2}/))?.[0] || '0:00';
-
-            return {
-                type: 'timestamp',
-                raw: match[0],
-                text: display,
-                seconds: timeToSeconds(firstTime),
-            } as TimestampToken;
+            const firstTime = (match[1].match(/\d{1,2}:\d{2}:\d{2}/) || match[1].match(/\d{1,2}:\d{2}/))?.[0] || '0:00';
+            return { type: 'timestamp', raw: match[0], text: match[0], seconds: timeToSeconds(firstTime) } as TimestampToken;
         }
 
-        match = rangeRegex.exec(src);
+        match = TS_RANGE.exec(src);
         if (match) {
             const display = match[1];
             const firstTime = (display.match(/\d{1,2}:\d{2}:\d{2}/) || display.match(/\d{1,2}:\d{2}/))?.[0] || '0:00';
-
-            return {
-                type: 'timestamp',
-                raw: match[0],
-                text: display,
-                seconds: timeToSeconds(firstTime),
-            } as TimestampToken;
+            return { type: 'timestamp', raw: match[0], text: display, seconds: timeToSeconds(firstTime) } as TimestampToken;
         }
 
         return undefined;
@@ -154,9 +122,9 @@ export function renderMarkdown(text: string): string {
 }
 
 function sanitizeHtml(html: string): string {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(`<div>${html}</div>`, 'text/html');
-    const root = doc.body.firstElementChild as HTMLElement;
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    const root = tpl.content;
     const allowedTags = new Set([
         'P',
         'STRONG',
@@ -191,29 +159,27 @@ function sanitizeHtml(html: string): string {
         if (node.nodeType === Node.ELEMENT_NODE) {
             const el = node as HTMLElement;
             if (!allowedTags.has(el.tagName)) {
-                const textNode = doc.createTextNode(el.textContent || '');
-                el.replaceWith(textNode);
+                el.replaceWith(document.createTextNode(el.textContent || ''));
                 return;
             }
 
             const allowed = allowedAttrs[el.tagName] || new Set<string>();
-            Array.from(el.attributes).forEach((attr) => {
-                if (!allowed.has(attr.name)) {
-                    el.removeAttribute(attr.name);
-                }
-            });
+            for (let i = el.attributes.length - 1; i >= 0; i--) {
+                const attr = el.attributes[i];
+                if (!allowed.has(attr.name)) el.removeAttribute(attr.name);
+            }
 
             if (el.tagName === 'A') {
                 const href = el.getAttribute('href') || '#';
-                if (!/^(https?:|mailto:)/i.test(href)) {
-                    el.setAttribute('href', '#');
-                }
+                if (!/^(https?:|mailto:)/i.test(href)) el.setAttribute('href', '#');
             }
         }
 
-        Array.from(node.childNodes).forEach((child) => walk(child));
+        for (const child of Array.from(node.childNodes)) walk(child);
     };
 
     walk(root);
-    return root.innerHTML;
+    const div = document.createElement('div');
+    div.appendChild(root);
+    return div.innerHTML;
 }

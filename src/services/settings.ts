@@ -18,6 +18,7 @@ export const STORAGE_KEYS: (keyof Settings)[] = [
     'custom_api_key',
     'custom_model',
     'fast_followups',
+    'chat_direct_mode',
     'auto_generate_topics',
     'translation_lookahead_buffer',
     'translation_refill_threshold',
@@ -51,6 +52,7 @@ export function normalizeSettings(data: Record<string, unknown>): Settings {
         custom_model: typeof data.custom_model === 'string' ? data.custom_model : undefined,
 
         fast_followups: data.fast_followups === true ? true : undefined,
+        chat_direct_mode: data.chat_direct_mode === true ? true : undefined,
         auto_generate_topics: data.auto_generate_topics === true,
 
         translation_lookahead_buffer: isFiniteNumber(data.translation_lookahead_buffer)
