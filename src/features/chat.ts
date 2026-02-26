@@ -34,7 +34,10 @@ export function buildMessages(systemPrompt: string, chatHistory: ChatMessage[]):
 const TIMESTAMP_RULES = `- Always cite timestamps from the transcript. Each timestamp MUST be in its own square brackets: [MM:SS] or [HH:MM:SS]. For multiple timestamps, write each separately like [1:30] [2:45] [10:02], NEVER group them like [1:30, 2:45].
 - For ranges, use [MM:SS-MM:SS] format.
 - Be concise and direct.
-- Use markdown formatting.`;
+- Use markdown formatting.
+- NEVER repeat yourself or restate what you or the user have already said. Build on your previous responses instead of restating them.
+- Answer each question fully in a single response. Do not split responses across multiple turns unless the user asks for a follow-up.
+- Keep responses brief - one to three paragraphs maximum unless the user requests detail.`;
 
 const TOOL_RULES = `HOW THE TOOLS WORK:
 - search_transcript: case-insensitive substring match against every segment. Returns up to 15 matching segments. A short stem like "invest" matches "investing", "investment", "investor", etc., so shorter roots catch more results than full inflected words.
