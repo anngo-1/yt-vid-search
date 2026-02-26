@@ -47,23 +47,20 @@ describe('buildMessages', () => {
         expect(messages[0].content).toBe('Test system prompt');
     });
 
-    it('includes full transcript in full system prompt', () => {
-        state.fullTranscriptText = '[0:00] Hello world';
+    it('informs LLM about tools in full system prompt', () => {
         const prompt = buildFullSystemPrompt();
-        expect(prompt).toContain('[0:00] Hello world');
+        expect(prompt).toContain('You have access to tools');
     });
 
-    it('includes transcript in follow-up prompt by default', () => {
-        state.fullTranscriptText = '[0:00] Test transcript text here';
+    it('informs LLM about tools in follow-up prompt by default', () => {
         const prompt = buildFollowUpSystemPrompt();
-        expect(prompt).toContain('[0:00] Test transcript text here');
+        expect(prompt).toContain('You have access to tools');
     });
 
-    it('omits transcript in follow-up prompt when fast_followups enabled', () => {
-        state.fullTranscriptText = '[0:00] Test transcript text here';
+    it('uses condensed tools message when fast_followups enabled', () => {
         state.settings = { fast_followups: true };
         const prompt = buildFollowUpSystemPrompt();
-        expect(prompt).not.toContain('[0:00] Test transcript text here');
+        expect(prompt).toContain('Use your transcript tools along with the conversation history');
     });
 
     it('appends chat history to messages', () => {

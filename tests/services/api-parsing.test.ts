@@ -59,7 +59,7 @@ describe('extractSSEEvents', () => {
 describe('parseSSEData', () => {
     it('extracts content from valid JSON', () => {
         const data = '{"choices":[{"delta":{"content":"hello"}}]}';
-        expect(parseSSEData(data)).toBe('hello');
+        expect(parseSSEData(data)).toEqual({ content: 'hello', tool_calls: undefined });
     });
 
     it('returns null for malformed JSON', () => {
@@ -67,17 +67,17 @@ describe('parseSSEData', () => {
     });
 
     it('returns [DONE] for done signal', () => {
-        expect(parseSSEData('[DONE]')).toBe('[DONE]');
-        expect(parseSSEData('  [DONE]  ')).toBe('[DONE]');
+        expect(parseSSEData('[DONE]')).toEqual({ content: '[DONE]' });
+        expect(parseSSEData('  [DONE]  ')).toEqual({ content: '[DONE]' });
     });
 
     it('returns null for empty string', () => {
         expect(parseSSEData('')).toBeNull();
     });
 
-    it('returns null when no content in delta', () => {
+    it('returns object with undefined fields when no content in delta', () => {
         const data = '{"choices":[{"delta":{}}]}';
-        expect(parseSSEData(data)).toBeNull();
+        expect(parseSSEData(data)).toEqual({ content: undefined, tool_calls: undefined });
     });
 });
 
