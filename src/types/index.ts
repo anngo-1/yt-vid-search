@@ -36,6 +36,9 @@ export interface Settings {
     // Topics settings
     auto_generate_topics?: boolean; // Automatically generate topics when panel opens
 
+    // General settings
+    auto_open_transcript?: boolean; // Automatically open transcript panel on new video
+
     // Translation settings
     translation_lookahead_buffer?: number;
     translation_refill_threshold?: number;

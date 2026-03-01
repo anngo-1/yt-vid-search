@@ -329,6 +329,10 @@ function resetForNewVideo(videoId: string): void {
     clearRetryState();
     destroyPanel();
     observeTranscriptPanel();
+
+    if (state.settings.auto_open_transcript) {
+        fetchTranscript();
+    }
 }
 
 function closeAndCleanup(): void {

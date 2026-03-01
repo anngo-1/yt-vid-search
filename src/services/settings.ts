@@ -20,6 +20,7 @@ export const STORAGE_KEYS: (keyof Settings)[] = [
     'fast_followups',
     'chat_direct_mode',
     'auto_generate_topics',
+    'auto_open_transcript',
     'translation_lookahead_buffer',
     'translation_refill_threshold',
     'translation_max_concurrent',
@@ -54,6 +55,7 @@ export function normalizeSettings(data: Record<string, unknown>): Settings {
         fast_followups: data.fast_followups === true ? true : undefined,
         chat_direct_mode: data.chat_direct_mode === true ? true : undefined,
         auto_generate_topics: data.auto_generate_topics === true,
+        auto_open_transcript: data.auto_open_transcript === true ? true : undefined,
 
         translation_lookahead_buffer: isFiniteNumber(data.translation_lookahead_buffer)
             ? data.translation_lookahead_buffer
