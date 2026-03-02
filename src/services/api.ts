@@ -104,6 +104,13 @@ export interface StreamCompletionResult {
     tool_calls?: ToolCall[];
 }
 
+interface StreamingToolCallChunk {
+    index?: number;
+    id?: string;
+    type?: 'function';
+    function?: { name?: string; arguments?: string };
+}
+
 /** stream response from LLM provider via background script, returns full response when complete */
 export async function streamCompletion({
     messages,
@@ -127,15 +134,13 @@ export async function streamCompletion({
     const headers = getHeaders(settings, feature);
     const model = resolveModel(settings, feature);
 
-    const bodyObj: any = {
+    const bodyObj = {
         model,
         messages,
         temperature: temperature ?? settings.temperature ?? DEFAULT_TEMP,
         stream: true,
+        ...(tools && tools.length > 0 ? { tools } : {}),
     };
-    if (tools && tools.length > 0) {
-        bodyObj.tools = tools;
-    }
     const body = JSON.stringify(bodyObj);
 
     return new Promise((resolve, reject) => {
@@ -374,7 +379,7 @@ export function extractSSEEvents(
 
 export interface ParsedSSEData {
     content?: string;
-    tool_calls?: any[];
+    tool_calls?: StreamingToolCallChunk[];
     error?: string;
 }
 

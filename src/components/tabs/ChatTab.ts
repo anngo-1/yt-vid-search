@@ -9,7 +9,7 @@ import { state } from '@/services/state';
 import { store } from '@/services/store';
 import { renderMarkdown } from '@/utils/markdown';
 import { isProviderConfigured } from '@/services/state';
-import { streamCompletion, type StreamCompletionResult } from '@/services/api';
+import { streamCompletion } from '@/services/api';
 import { buildMessages, buildFullSystemPrompt, buildFollowUpSystemPrompt, shouldUseTools } from '@/features/chat';
 import type { Tool } from '@/types';
 import { showToast } from '@/services/notifications';
@@ -181,7 +181,7 @@ export class ChatTab extends Component {
 
         const systemPrompt = state.chatHistory.length <= 2 ? buildFullSystemPrompt() : buildFollowUpSystemPrompt();
 
-        let currentMessages = buildMessages(systemPrompt, state.chatHistory);
+        const currentMessages = buildMessages(systemPrompt, state.chatHistory);
 
         const container = this.q('#yt-chat-messages');
         if (!container) return;
@@ -329,13 +329,13 @@ export class ChatTab extends Component {
                             try {
                                 const args = JSON.parse(tc.function.arguments);
                                 if (args.query) displayAction += ` for "${args.query}"`;
-                            } catch {}
+                            } catch { /* ignore parse errors */ }
                         } else if (toolName === 'read_transcript') {
                             displayAction = 'Reading transcript';
                             try {
                                 const args = JSON.parse(tc.function.arguments);
                                 if (args.start_seconds != null) displayAction += ` from ${args.start_seconds}s`;
-                            } catch {}
+                            } catch { /* ignore parse errors */ }
                         }
 
                         const toolStatusEl = document.createElement('div');
