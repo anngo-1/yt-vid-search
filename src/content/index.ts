@@ -27,6 +27,7 @@ import type { TranscriptSegment } from '@/types';
 let panel: Panel | null = null;
 let fetchTimeout: ReturnType<typeof setTimeout> | null = null;
 let transcriptObserver: MutationObserver | null = null;
+let observingForVideoId: string | null = null;
 
 const PANEL_SELECTOR = 'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]';
 const SEGMENT_SELECTOR = 'ytd-transcript-segment-renderer';
@@ -147,6 +148,9 @@ function destroyPanel(): void {
 function observeTranscriptPanel(): void {
     if (transcriptObserver) return;
 
+    // Snapshot the video ID so we can discard segments that arrive after a switch
+    observingForVideoId = state.currentVideoId;
+
     // Check if segments already exist (user had panel open)
     const ytPanel = document.querySelector(PANEL_SELECTOR);
     if (ytPanel) {
@@ -174,6 +178,7 @@ function observeTranscriptPanel(): void {
 function disconnectObserver(): void {
     transcriptObserver?.disconnect();
     transcriptObserver = null;
+    observingForVideoId = null;
 }
 
 function parseDOMTranscript(segments: NodeListOf<Element>): TranscriptSegment[] {
@@ -196,6 +201,8 @@ function parseDOMTranscript(segments: NodeListOf<Element>): TranscriptSegment[] 
 }
 
 function handleDOMTranscript(segments: NodeListOf<Element>): void {
+    // Discard if the video changed since we started observing (stale DOM segments)
+    if (observingForVideoId !== null && observingForVideoId !== state.currentVideoId) return;
     if (!state.isOurFetch && !state.transcript.length) return; // ignore passive fires after timeout
     const parsed = parseDOMTranscript(segments);
     store.set('transcript', parsed);
@@ -211,8 +218,9 @@ function handleDOMTranscript(segments: NodeListOf<Element>): void {
 }
 
 /** Poll for segments after clicking the transcript button (active backup for the passive observer) */
-function pollForSegments(attempts = 0): void {
+function pollForSegments(attempts = 0, forVideoId = state.currentVideoId): void {
     if (!state.isOurFetch) return; // already completed or timed out
+    if (forVideoId !== state.currentVideoId) return; // video changed, abort this poll chain
 
     const ytPanel = document.querySelector(PANEL_SELECTOR);
     if (ytPanel) {
@@ -225,7 +233,7 @@ function pollForSegments(attempts = 0): void {
 
     if (attempts < 20) {
         // 20 × 400ms = 8s
-        setTimeout(() => pollForSegments(attempts + 1), 400);
+        setTimeout(() => pollForSegments(attempts + 1, forVideoId), 400);
     }
 }
 
