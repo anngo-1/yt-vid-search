@@ -9,9 +9,10 @@ import { state } from '@/services/state';
 import { store } from '@/services/store';
 import { renderMarkdown } from '@/utils/markdown';
 import { isProviderConfigured } from '@/services/state';
-import { streamCompletion } from '@/services/api';
-import { buildMessages, buildFullSystemPrompt, buildFollowUpSystemPrompt, shouldUseTools } from '@/features/chat';
+import { streamCompletion, fetchOpenRouterContextLength } from '@/services/api';
+import { buildMessages, buildFullSystemPrompt, buildFollowUpSystemPrompt, shouldUseTools, estimateUsedTokens } from '@/features/chat';
 import type { Tool } from '@/types';
+import { resolveModel, resolveProvider } from '@/utils/llm';
 import { showToast } from '@/services/notifications';
 import { ApiError } from '@/services/errors';
 import { ICONS } from '@/content/icons';
@@ -26,6 +27,7 @@ export class ChatTab extends Component {
         this.el.innerHTML = `
       <div class="yt-ask-header">
         <span class="yt-label-small">Chat</span>
+        <div class="yt-context-bar" id="yt-context-bar" style="display:none"></div>
         <button id="yt-chat-clear" class="yt-link-btn">Clear</button>
       </div>
       <div id="yt-key-warning" class="yt-key-warning" style="display:none"></div>
@@ -44,6 +46,8 @@ export class ChatTab extends Component {
                 this.addMessage(msg.role, msg.content || '');
             }
         });
+
+        this.updateContextBar();
     }
 
     addMessage(role: string, content: string): void {
@@ -77,6 +81,40 @@ export class ChatTab extends Component {
         } else {
             warning.style.display = 'none';
         }
+    }
+
+    updateContextBar(): void {
+        const provider = resolveProvider(state.settings, 'chat');
+        const bar = this.q<HTMLElement>('#yt-context-bar');
+        if (!bar) return;
+
+        if (provider !== 'openrouter') {
+            bar.style.display = 'none';
+            return;
+        }
+
+        const history = state.chatHistory;
+        if (!history.length) {
+            bar.style.display = 'none';
+            return;
+        }
+
+        const usedTokens = estimateUsedTokens(); // estimate
+
+        const model = resolveModel(state.settings, 'chat');
+        const apiKey = state.settings.openrouter_api_key || '';
+
+        fetchOpenRouterContextLength(model, apiKey).then((maxTokens) => {
+            if (!maxTokens) { bar.style.display = 'none'; return; }
+
+            const pct = Math.min(100, Math.round((usedTokens / maxTokens) * 100));
+            const fmtK = (n: number) => n >= 1000 ? `${Math.round(n / 1000)}k` : String(n);
+
+            bar.style.display = 'flex';
+            if (pct >= 90) { bar.setAttribute('data-critical', ''); } else { bar.removeAttribute('data-critical'); }
+            if (pct >= 75) { bar.setAttribute('data-high', ''); } else { bar.removeAttribute('data-high'); }
+            bar.innerHTML = `<span class="yt-context-bar-text">${fmtK(usedTokens)}&thinsp;/&thinsp;${fmtK(maxTokens)} <span class="yt-context-bar-pct">(${pct}%)</span></span>`;
+        }).catch(() => { bar.style.display = 'none'; });
     }
 
     // --- events ---
@@ -178,6 +216,7 @@ export class ChatTab extends Component {
         this.addMessage('user', text);
         store.set('chatHistory', [...state.chatHistory, { role: 'user', content: text }]);
         chrome.storage.session.set({ chatHistory: state.chatHistory });
+        this.updateContextBar();
 
         const systemPrompt = state.chatHistory.length <= 2 ? buildFullSystemPrompt() : buildFollowUpSystemPrompt();
 
@@ -295,6 +334,7 @@ export class ChatTab extends Component {
                     currentMessages.filter((m) => m.role !== 'system'),
                 );
                 chrome.storage.session.set({ chatHistory: state.chatHistory });
+                this.updateContextBar();
 
                 if (!response.tool_calls || response.tool_calls.length === 0) {
                     let finalHtml = renderMarkdown(response.content || '');
@@ -393,8 +433,8 @@ export class ChatTab extends Component {
                     error instanceof ApiError
                         ? `API Error: ${error.message}${error.status ? ` (${error.status})` : ''}`
                         : error instanceof Error
-                          ? error.message
-                          : 'Unknown error';
+                            ? error.message
+                            : 'Unknown error';
                 this.addMessage('system', `Error: ${msg}`);
             }
         } finally {
@@ -408,6 +448,7 @@ export class ChatTab extends Component {
         store.set('isChatCleared', true);
         const container = this.q('#yt-chat-messages');
         if (container) container.innerHTML = '';
+        this.updateContextBar();
     }
 }
 

@@ -414,3 +414,48 @@ function tryParseError(text: string): string | null {
 
 // Re-export translation API for backwards compatibility
 export { translateSegments, parseTranslationResponse, normalizeTranslationMap } from '@/services/translation-api';
+
+// --- OpenRouter model info ---
+
+const _orContextCache = new Map<string, number>();
+
+/**
+ * Fetch the context_length for an OpenRouter model.
+ * Routes through the background script (no CORS). Cached per model per session.
+ * Returns null if the API key is missing, the model isn't found, or the request fails.
+ */
+export async function fetchOpenRouterContextLength(modelId: string, apiKey: string): Promise<number | null> {
+    if (!modelId || !apiKey) return null;
+
+    if (_orContextCache.has(modelId)) return _orContextCache.get(modelId)!;
+
+    return new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+            {
+                type: 'API_REQUEST',
+                requestId: `or-models-${Date.now()}`,
+                url: 'https://openrouter.ai/api/v1/models',
+                options: {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${apiKey}`,
+                    },
+                },
+            },
+            undefined,
+            (response: unknown) => {
+                try {
+                    if (!isApiResponse(response) || !response.ok) { resolve(null); return; }
+                    const data = JSON.parse(response.body || '{}');
+                    const models: Array<{ id: string; context_length?: number }> = data.data || [];
+                    const match = models.find((m) => m.id === modelId);
+                    const ctx = match?.context_length ?? null;
+                    if (ctx !== null) _orContextCache.set(modelId, ctx);
+                    resolve(ctx);
+                } catch {
+                    resolve(null);
+                }
+            },
+        );
+    });
+}

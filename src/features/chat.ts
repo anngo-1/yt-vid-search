@@ -31,6 +31,19 @@ export function buildMessages(systemPrompt: string, chatHistory: ChatMessage[]):
     return [{ role: 'system', content: systemPrompt }, ...chatHistory];
 }
 
+/**
+ * Estimate how many tokens the next API call will consume.
+ * Accounts for the system prompt (which may embed the full transcript in direct/auto-inline mode)
+ * plus all chat history messages, using the standard chars/4 approximation.
+ */
+export function estimateUsedTokens(): number {
+    const history = state.chatHistory;
+    const systemPrompt = history.length <= 1 ? buildFullSystemPrompt() : buildFollowUpSystemPrompt();
+    const messages = buildMessages(systemPrompt, history);
+    const totalChars = messages.reduce((sum, m) => sum + (m.content?.length ?? 0), 0);
+    return Math.round(totalChars / 4);
+}
+
 const TIMESTAMP_RULES = `- Always cite timestamps from the transcript. Each timestamp MUST be in its own square brackets: [MM:SS] or [HH:MM:SS]. For multiple timestamps, write each separately like [1:30] [2:45] [10:02], NEVER group them like [1:30, 2:45].
 - For ranges, use [MM:SS-MM:SS] format.
 - Be concise and direct.

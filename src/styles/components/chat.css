@@ -11,6 +11,36 @@
     padding: var(--yt-spacing-md) var(--yt-spacing-xl);
     border-bottom: 1px solid var(--yt-border-color-light);
     flex-shrink: 0;
+    gap: var(--yt-spacing-md);
+}
+
+/* Context length usage indicator (OpenRouter only) */
+.yt-context-bar {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+.yt-context-bar-text {
+    font-size: var(--yt-font-size-sm);
+    color: var(--yt-text-tertiary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    transition: color 0.3s;
+}
+
+.yt-context-bar-pct {
+    opacity: 0.75;
+}
+
+/* Amber when > 75% */
+.yt-context-bar[data-high] .yt-context-bar-text {
+    color: var(--yt-color-warning, #f59e0b);
+}
+
+/* Red when > 90% */
+.yt-context-bar[data-critical] .yt-context-bar-text {
+    color: var(--yt-color-error);
 }
 
 .yt-link-btn {
