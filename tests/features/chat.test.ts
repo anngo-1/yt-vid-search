@@ -57,10 +57,9 @@ describe('buildMessages', () => {
         expect(prompt).toContain('You have access to tools');
     });
 
-    it('uses condensed tools message when fast_followups enabled', () => {
-        state.settings = { fast_followups: true };
+    it('follow-up prompt always includes tool instructions', () => {
         const prompt = buildFollowUpSystemPrompt();
-        expect(prompt).toContain('Use your transcript tools along with the conversation history');
+        expect(prompt).toContain('You have access to tools');
     });
 
     it('appends chat history to messages', () => {

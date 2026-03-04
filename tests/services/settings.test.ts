@@ -34,7 +34,8 @@ describe('normalizeSettings', () => {
         expect(result.openrouter_api_key).toBe('key123');
         expect(result.local_port).toBe(5000);
         expect(result.custom_endpoint).toBe('http://api.test');
-        expect(result.fast_followups).toBe(true);
+        expect(result.fast_followups).toBeUndefined(); // deprecated
+        expect(result.chat_no_history).toBeUndefined();
         expect(result.auto_generate_topics).toBe(true);
     });
 
@@ -45,6 +46,7 @@ describe('normalizeSettings', () => {
         expect(result.chat_provider).toBe('local');
         expect(result.topics_provider).toBe('local');
         expect(result.captions_provider).toBe('local');
+        expect(result.chat_direct_mode).toBe(true); // default ON
         expect(result.auto_generate_topics).toBe(false);
     });
 
