@@ -17,8 +17,9 @@ export const STORAGE_KEYS: (keyof Settings)[] = [
     'custom_endpoint',
     'custom_api_key',
     'custom_model',
-    'fast_followups',
+    'fast_followups', // kept for storage compat
     'chat_direct_mode',
+    'chat_no_history',
     'auto_generate_topics',
     'auto_open_transcript',
     'translation_lookahead_buffer',
@@ -52,8 +53,9 @@ export function normalizeSettings(data: Record<string, unknown>): Settings {
         custom_api_key: typeof data.custom_api_key === 'string' ? data.custom_api_key : undefined,
         custom_model: typeof data.custom_model === 'string' ? data.custom_model : undefined,
 
-        fast_followups: data.fast_followups === true ? true : undefined,
-        chat_direct_mode: data.chat_direct_mode === true ? true : undefined,
+        fast_followups: undefined, // deprecated
+        chat_direct_mode: data.chat_direct_mode === false ? false : true, // default ON
+        chat_no_history: data.chat_no_history === true ? true : undefined,
         auto_generate_topics: data.auto_generate_topics === true,
         auto_open_transcript: data.auto_open_transcript === true ? true : undefined,
 

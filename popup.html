@@ -1,201 +1,200 @@
 <!doctype html>
 <html>
-    <head>
-        <meta charset="UTF-8" />
-        <link rel="stylesheet" href="popup.css" />
-    </head>
 
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1>Ask Transcript</h1>
-                <div class="version">v3.5</div>
-            </div>
+<head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="popup.css" />
+</head>
 
-            <div class="main-action">
-                <button id="openPanelBtn" class="primary-btn">Open Transcript Panel</button>
-            </div>
-
-            <!-- Tabs -->
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="features">Features</button>
-                <button class="tab-btn" data-tab="providers">Providers</button>
-                <button class="tab-btn" data-tab="general">General</button>
-            </div>
-
-            <!-- Tab 1: Features -->
-            <div id="tab-features" class="tab-content active">
-                <div class="feature-config">
-                    <h3>Chat</h3>
-                    <div class="section">
-                        <label>Provider</label>
-                        <select id="chatProvider">
-                            <option value="local">Local (LM Studio)</option>
-                            <option value="openrouter">OpenRouter</option>
-                            <option value="custom">Custom Endpoint</option>
-                        </select>
-                    </div>
-                    <div class="section">
-                        <label>Model (optional)</label>
-                        <input type="text" id="chatModel" placeholder="default" autocomplete="off" />
-                    </div>
-                </div>
-
-                <div class="feature-config">
-                    <h3>Topics</h3>
-                    <div class="section">
-                        <label>Provider</label>
-                        <select id="topicsProvider">
-                            <option value="local">Local (LM Studio)</option>
-                            <option value="openrouter">OpenRouter</option>
-                            <option value="custom">Custom Endpoint</option>
-                        </select>
-                    </div>
-                    <div class="section">
-                        <label>Model (optional)</label>
-                        <input type="text" id="topicsModel" placeholder="default" autocomplete="off" />
-                    </div>
-                </div>
-
-                <div class="feature-config">
-                    <h3>Captions (Translation)</h3>
-                    <div class="section">
-                        <label>Provider</label>
-                        <select id="captionsProvider">
-                            <option value="local">Local (LM Studio)</option>
-                            <option value="openrouter">OpenRouter</option>
-                            <option value="custom">Custom Endpoint</option>
-                        </select>
-                    </div>
-                    <div class="section">
-                        <label>Model (optional)</label>
-                        <input type="text" id="captionsModel" placeholder="default" autocomplete="off" />
-                    </div>
-
-                    <div class="advanced-config">
-                        <h4>Advanced Translation</h4>
-                        <div class="section">
-                            <label for="translationLookahead">Lookahead Buffer (segments)</label>
-                            <input type="number" id="translationLookahead" placeholder="60" autocomplete="off" />
-                            <div class="hint">How many segments to prefetch (default: 60)</div>
-                        </div>
-                        <div class="section">
-                            <label for="translationRefill">Refill Threshold (segments)</label>
-                            <input type="number" id="translationRefill" placeholder="30" autocomplete="off" />
-                            <div class="hint">When to fetch more (default: 30)</div>
-                        </div>
-                        <div class="section">
-                            <label for="translationConcurrent">Max Concurrent Requests</label>
-                            <input type="number" id="translationConcurrent" placeholder="3" autocomplete="off" />
-                            <div class="hint">Parallel API calls (default: 3)</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tab 2: Providers -->
-            <div id="tab-providers" class="tab-content">
-                <!-- Local LM Studio settings -->
-                <div class="provider-group">
-                    <h3>Local (LM Studio)</h3>
-                    <div class="section">
-                        <label for="localPort">Port</label>
-                        <input type="number" id="localPort" placeholder="1234" value="1234" autocomplete="off" />
-                        <div class="hint">LM Studio default port is 1234</div>
-                    </div>
-                    <div class="section">
-                        <label for="localModel">Default Model</label>
-                        <input type="text" id="localModel" placeholder="local-model" autocomplete="off" />
-                    </div>
-                </div>
-
-                <!-- OpenRouter settings -->
-                <div class="provider-group">
-                    <h3>OpenRouter</h3>
-                    <div class="section">
-                        <label for="apiKey">API Key</label>
-                        <input type="password" id="apiKey" placeholder="sk-or-v1-..." autocomplete="off" />
-                        <div class="hint"><a href="https://openrouter.ai/keys" target="_blank">Get Key</a></div>
-                    </div>
-                    <div class="section">
-                        <label for="model">Default Model</label>
-                        <input type="text" id="model" placeholder="openai/gpt-4o-mini" autocomplete="off" />
-                    </div>
-                </div>
-
-                <!-- Custom endpoint settings -->
-                <div class="provider-group">
-                    <h3>Custom Endpoint</h3>
-                    <div class="section">
-                        <label for="customEndpoint">API Endpoint</label>
-                        <input
-                            type="text"
-                            id="customEndpoint"
-                            placeholder="http://localhost:8080/v1/chat/completions"
-                            autocomplete="off"
-                        />
-                    </div>
-                    <div class="section">
-                        <label for="customApiKey">API Key</label>
-                        <input type="password" id="customApiKey" placeholder="sk-..." autocomplete="off" />
-                    </div>
-                    <div class="section">
-                        <label for="customModel">Default Model</label>
-                        <input type="text" id="customModel" placeholder="gpt-4" autocomplete="off" />
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tab 3: General -->
-            <div id="tab-general" class="tab-content">
-                <div class="section">
-                    <label for="temperature">Temperature</label>
-                    <div class="range-container">
-                        <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7" />
-                        <span id="tempValue">0.7</span>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="fastFollowups" />
-                        <span>Fast follow-ups (Chat)</span>
-                    </label>
-                    <div class="hint">Only send transcript on first message.</div>
-                </div>
-
-                <div class="section">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="chatDirectMode" />
-                        <span>Direct mode (Chat)</span>
-                    </label>
-                    <div class="hint">Always include the full transcript in the prompt. No tool calls.</div>
-                </div>
-
-                <div class="section">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="autoGenerateTopics" />
-                        <span>Auto-generate topics</span>
-                    </label>
-                </div>
-
-                <div class="section">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="autoOpenTranscript" />
-                        <span>Auto-open transcript on new video</span>
-                    </label>
-                    <div class="hint">Automatically fetch and open transcript when navigating to a new video.</div>
-                </div>
-
-                <div class="buttons">
-                    <button id="saveBtn" class="save-btn">Save Settings</button>
-                    <button id="clearKeyBtn" class="clear-btn">Clear Keys</button>
-                </div>
-            </div>
-
-            <div id="status" class="status"></div>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Ask Transcript</h1>
+            <div class="version">v3.5</div>
         </div>
 
-        <script type="module" src="src/popup/index.ts"></script>
-    </body>
+        <div class="main-action">
+            <button id="openPanelBtn" class="primary-btn">Open Transcript Panel</button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="features">Features</button>
+            <button class="tab-btn" data-tab="providers">Providers</button>
+            <button class="tab-btn" data-tab="general">General</button>
+        </div>
+
+        <!-- Tab 1: Features -->
+        <div id="tab-features" class="tab-content active">
+            <div class="feature-config">
+                <h3>Chat</h3>
+                <div class="section">
+                    <label>Provider</label>
+                    <select id="chatProvider">
+                        <option value="local">Local (LM Studio)</option>
+                        <option value="openrouter">OpenRouter</option>
+                        <option value="custom">Custom Endpoint</option>
+                    </select>
+                </div>
+                <div class="section">
+                    <label>Model (optional)</label>
+                    <input type="text" id="chatModel" placeholder="default" autocomplete="off" />
+                </div>
+            </div>
+
+            <div class="feature-config">
+                <h3>Topics</h3>
+                <div class="section">
+                    <label>Provider</label>
+                    <select id="topicsProvider">
+                        <option value="local">Local (LM Studio)</option>
+                        <option value="openrouter">OpenRouter</option>
+                        <option value="custom">Custom Endpoint</option>
+                    </select>
+                </div>
+                <div class="section">
+                    <label>Model (optional)</label>
+                    <input type="text" id="topicsModel" placeholder="default" autocomplete="off" />
+                </div>
+            </div>
+
+            <div class="feature-config">
+                <h3>Captions (Translation)</h3>
+                <div class="section">
+                    <label>Provider</label>
+                    <select id="captionsProvider">
+                        <option value="local">Local (LM Studio)</option>
+                        <option value="openrouter">OpenRouter</option>
+                        <option value="custom">Custom Endpoint</option>
+                    </select>
+                </div>
+                <div class="section">
+                    <label>Model (optional)</label>
+                    <input type="text" id="captionsModel" placeholder="default" autocomplete="off" />
+                </div>
+
+                <div class="advanced-config">
+                    <h4>Advanced Translation</h4>
+                    <div class="section">
+                        <label for="translationLookahead">Lookahead Buffer (segments)</label>
+                        <input type="number" id="translationLookahead" placeholder="60" autocomplete="off" />
+                        <div class="hint">How many segments to prefetch (default: 60)</div>
+                    </div>
+                    <div class="section">
+                        <label for="translationRefill">Refill Threshold (segments)</label>
+                        <input type="number" id="translationRefill" placeholder="30" autocomplete="off" />
+                        <div class="hint">When to fetch more (default: 30)</div>
+                    </div>
+                    <div class="section">
+                        <label for="translationConcurrent">Max Concurrent Requests</label>
+                        <input type="number" id="translationConcurrent" placeholder="3" autocomplete="off" />
+                        <div class="hint">Parallel API calls (default: 3)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Providers -->
+        <div id="tab-providers" class="tab-content">
+            <!-- Local LM Studio settings -->
+            <div class="provider-group">
+                <h3>Local (LM Studio)</h3>
+                <div class="section">
+                    <label for="localPort">Port</label>
+                    <input type="number" id="localPort" placeholder="1234" value="1234" autocomplete="off" />
+                    <div class="hint">LM Studio default port is 1234</div>
+                </div>
+                <div class="section">
+                    <label for="localModel">Default Model</label>
+                    <input type="text" id="localModel" placeholder="local-model" autocomplete="off" />
+                </div>
+            </div>
+
+            <!-- OpenRouter settings -->
+            <div class="provider-group">
+                <h3>OpenRouter</h3>
+                <div class="section">
+                    <label for="apiKey">API Key</label>
+                    <input type="password" id="apiKey" placeholder="sk-or-v1-..." autocomplete="off" />
+                    <div class="hint"><a href="https://openrouter.ai/keys" target="_blank">Get Key</a></div>
+                </div>
+                <div class="section">
+                    <label for="model">Default Model</label>
+                    <input type="text" id="model" placeholder="openai/gpt-4o-mini" autocomplete="off" />
+                </div>
+            </div>
+
+            <!-- Custom endpoint settings -->
+            <div class="provider-group">
+                <h3>Custom Endpoint</h3>
+                <div class="section">
+                    <label for="customEndpoint">API Endpoint</label>
+                    <input type="text" id="customEndpoint" placeholder="http://localhost:8080/v1/chat/completions"
+                        autocomplete="off" />
+                </div>
+                <div class="section">
+                    <label for="customApiKey">API Key</label>
+                    <input type="password" id="customApiKey" placeholder="sk-..." autocomplete="off" />
+                </div>
+                <div class="section">
+                    <label for="customModel">Default Model</label>
+                    <input type="text" id="customModel" placeholder="gpt-4" autocomplete="off" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: General -->
+        <div id="tab-general" class="tab-content">
+            <div class="section">
+                <label for="temperature">Temperature</label>
+                <div class="range-container">
+                    <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7" />
+                    <span id="tempValue">0.7</span>
+                </div>
+            </div>
+
+            <div class="section">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chatDirectMode" checked />
+                    <span>Direct mode (Chat)</span>
+                </label>
+                <div class="hint">Always include the full transcript in the prompt. No tool calls.</div>
+            </div>
+
+            <div class="section">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chatNoHistory" />
+                    <span>No history (Chat)</span>
+                </label>
+                <div class="hint">Each message is sent independently — the model has no memory of previous exchanges in
+                    the conversation.</div>
+            </div>
+
+            <div class="section">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="autoGenerateTopics" />
+                    <span>Auto-generate topics</span>
+                </label>
+            </div>
+
+            <div class="section">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="autoOpenTranscript" />
+                    <span>Auto-open transcript on new video</span>
+                </label>
+                <div class="hint">Automatically fetch and open transcript when navigating to a new video.</div>
+            </div>
+
+            <div class="buttons">
+                <button id="saveBtn" class="save-btn">Save Settings</button>
+                <button id="clearKeyBtn" class="clear-btn">Clear Keys</button>
+            </div>
+        </div>
+
+        <div id="status" class="status"></div>
+    </div>
+
+    <script type="module" src="src/popup/index.ts"></script>
+</body>
+
 </html>

@@ -31,8 +31,8 @@ const SETTING_FIELDS: SettingConfig[] = [
     { id: 'customModel', key: 'custom_model', type: 'text', default: '' },
 
     // Flags
-    { id: 'fastFollowups', key: 'fast_followups', type: 'checkbox', default: false },
-    { id: 'chatDirectMode', key: 'chat_direct_mode', type: 'checkbox', default: false },
+    { id: 'chatDirectMode', key: 'chat_direct_mode', type: 'checkbox', default: true },
+    { id: 'chatNoHistory', key: 'chat_no_history', type: 'checkbox', default: false },
     { id: 'autoGenerateTopics', key: 'auto_generate_topics', type: 'checkbox', default: undefined }, // undefined handled specially
     { id: 'autoOpenTranscript', key: 'auto_open_transcript', type: 'checkbox', default: false },
 
@@ -116,7 +116,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Checkbox auto-save
-    $('fastFollowups')?.addEventListener('change', save);
+    $('chatDirectMode')?.addEventListener('change', save);
+    $('chatNoHistory')?.addEventListener('change', save);
     $('autoGenerateTopics')?.addEventListener('change', save);
     $('autoOpenTranscript')?.addEventListener('change', save);
 });

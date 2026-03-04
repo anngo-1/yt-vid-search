@@ -37,10 +37,20 @@ export function buildMessages(systemPrompt: string, chatHistory: ChatMessage[]):
  * plus all chat history messages, using the standard chars/4 approximation.
  */
 export function estimateUsedTokens(): number {
+    const noHistory = state.settings?.chat_no_history === true;
     const history = state.chatHistory;
-    const systemPrompt = history.length <= 1 ? buildFullSystemPrompt() : buildFollowUpSystemPrompt();
-    const messages = buildMessages(systemPrompt, history);
-    const totalChars = messages.reduce((sum, m) => sum + (m.content?.length ?? 0), 0);
+
+    // In no-history mode only the latest user message is sent
+    const effectiveHistory = noHistory ? history.slice(-1) : history;
+    let totalChars = effectiveHistory.reduce((sum, m) => sum + (m.content?.length ?? 0), 0);
+
+    // Add transcript chars when it would be inlined in the system prompt
+    const directMode = state.settings?.chat_direct_mode === true;
+    const transcriptChars = state.fullTranscriptText?.length ?? 0;
+    if (transcriptChars > 0 && (directMode || transcriptChars <= TRANSCRIPT_INLINE_CHARS)) {
+        totalChars += transcriptChars;
+    }
+
     return Math.round(totalChars / 4);
 }
 
@@ -108,19 +118,12 @@ RULES:
 ${TIMESTAMP_RULES}`;
     }
 
-    const fast = state.settings?.fast_followups === true;
-    let prompt = `You are an expert at analyzing video transcripts. You are helping a user understand a YouTube video titled "${title}".`;
+    return `You are an expert at analyzing video transcripts. You are helping a user understand a YouTube video titled "${title}".
 
-    if (fast) {
-        prompt += `\n\nUse your transcript tools along with the conversation history to answer the user's query.`;
-    } else {
-        prompt += `\n\nYou have access to tools that let you search the video transcript for specific keywords and read segments of the transcript.`;
-    }
+You have access to tools that let you search the video transcript for specific keywords and read segments of the transcript. Use them to gather information before answering the user's questions accurately.
 
-    prompt += `\n\n${TOOL_RULES}
+${TOOL_RULES}
 
 RESPONSE RULES:
 ${TIMESTAMP_RULES}`;
-
-    return prompt;
 }

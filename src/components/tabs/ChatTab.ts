@@ -218,9 +218,13 @@ export class ChatTab extends Component {
         chrome.storage.session.set({ chatHistory: state.chatHistory });
         this.updateContextBar();
 
-        const systemPrompt = state.chatHistory.length <= 2 ? buildFullSystemPrompt() : buildFollowUpSystemPrompt();
+        const noHistory = state.settings?.chat_no_history === true;
+        const historyToSend = noHistory
+            ? state.chatHistory.slice(-1) // only the current user message
+            : state.chatHistory;
+        const systemPrompt = historyToSend.length <= 1 ? buildFullSystemPrompt() : buildFollowUpSystemPrompt();
 
-        const currentMessages = buildMessages(systemPrompt, state.chatHistory);
+        const currentMessages = buildMessages(systemPrompt, historyToSend);
 
         const container = this.q('#yt-chat-messages');
         if (!container) return;

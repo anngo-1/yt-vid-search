@@ -31,8 +31,9 @@ export interface Settings {
     custom_api_key?: string;
     custom_model?: string; // Default custom model
     // Chat settings
-    fast_followups?: boolean; // Only send transcript on first message
+    fast_followups?: boolean; // (removed — kept for storage migration only)
     chat_direct_mode?: boolean; // Skip tools, always include full transcript in prompt
+    chat_no_history?: boolean; // Send each message independently; no prior conversation passed to the model
     // Topics settings
     auto_generate_topics?: boolean; // Automatically generate topics when panel opens
 
