@@ -333,14 +333,22 @@ function resetForNewVideo(videoId: string): void {
     clearFetchTimeout();
     disconnectObserver();
     store.set('isOurFetch', false);
+
+    store.set('transcript', []);
+    store.set('fullTranscriptText', '');
+
     resetState(videoId);
     clearRetryState();
     destroyPanel();
-    observeTranscriptPanel();
 
-    if (state.settings.auto_open_transcript) {
-        fetchTranscript();
-    }
+    setTimeout(() => {
+        if (state.currentVideoId === videoId) {
+            observeTranscriptPanel();
+            if (state.settings.auto_open_transcript) {
+                fetchTranscript();
+            }
+        }
+    }, 100);
 }
 
 function closeAndCleanup(): void {

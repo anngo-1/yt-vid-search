@@ -19,18 +19,11 @@ export function getVideoTitle(): string {
 
 /** get current video id from url */
 export function getVideoId(): string | null {
-    const params = new URLSearchParams(location.search);
-    const watchId = params.get('v');
-    if (watchId) return watchId;
-
     const path = location.pathname || '';
-    const shortsMatch = path.match(/^\/shorts\/([^/?#]+)/);
-    if (shortsMatch) return shortsMatch[1];
+    if (path !== '/watch') return null;
 
-    const embedMatch = path.match(/^\/embed\/([^/?#]+)/);
-    if (embedMatch) return embedMatch[1];
-
-    return null;
+    const params = new URLSearchParams(location.search);
+    return params.get('v');
 }
 
 /** get element by id with type safety */

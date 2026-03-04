@@ -15,15 +15,21 @@ describe('selectors', () => {
         expect($('nonexistent')).toBeNull();
     });
 
-    it('getVideoId extracts video id from URL', () => {
+    it('getVideoId extracts video id from /watch URLs only', () => {
         Object.defineProperty(window, 'location', {
-            value: { search: '?v=abc123' },
+            value: { search: '?v=abc123', pathname: '/watch' },
             writable: true,
         });
         expect(getVideoId()).toBe('abc123');
 
         Object.defineProperty(window, 'location', {
-            value: { search: '' },
+            value: { search: '?v=abc123', pathname: '/shorts/xyz' },
+            writable: true,
+        });
+        expect(getVideoId()).toBeNull();
+
+        Object.defineProperty(window, 'location', {
+            value: { search: '', pathname: '/watch' },
             writable: true,
         });
         expect(getVideoId()).toBeNull();
