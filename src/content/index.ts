@@ -145,19 +145,22 @@ function destroyPanel(): void {
 
 // --- transcript reading via DOM observer ---
 
-function observeTranscriptPanel(): void {
+function observeTranscriptPanel(skipEagerCheck = false): void {
     if (transcriptObserver) return;
 
     // Snapshot the video ID so we can discard segments that arrive after a switch
     observingForVideoId = state.currentVideoId;
 
-    // Check if segments already exist (user had panel open)
-    const ytPanel = document.querySelector(PANEL_SELECTOR);
-    if (ytPanel) {
-        const segments = ytPanel.querySelectorAll(SEGMENT_SELECTOR);
-        if (segments.length > 0) {
-            handleDOMTranscript(segments);
-            return;
+    // Check if segments already exist (user had panel open) — but skip this on
+    // fresh navigation since YouTube's DOM may still hold the previous video's segments
+    if (!skipEagerCheck) {
+        const ytPanel = document.querySelector(PANEL_SELECTOR);
+        if (ytPanel) {
+            const segments = ytPanel.querySelectorAll(SEGMENT_SELECTOR);
+            if (segments.length > 0 && !segments[0].hasAttribute('data-ask-parsed')) {
+                handleDOMTranscript(segments);
+                return;
+            }
         }
     }
 
@@ -165,7 +168,7 @@ function observeTranscriptPanel(): void {
         const ytPanel = document.querySelector(PANEL_SELECTOR);
         if (!ytPanel) return;
         const segments = ytPanel.querySelectorAll(SEGMENT_SELECTOR);
-        if (segments.length === 0) return;
+        if (segments.length === 0 || segments[0].hasAttribute('data-ask-parsed')) return;
 
         transcriptObserver?.disconnect();
         transcriptObserver = null;
@@ -204,6 +207,11 @@ function handleDOMTranscript(segments: NodeListOf<Element>): void {
     // Discard if the video changed since we started observing (stale DOM segments)
     if (observingForVideoId !== null && observingForVideoId !== state.currentVideoId) return;
     if (!state.isOurFetch && !state.transcript.length) return; // ignore passive fires after timeout
+
+    for (const segment of Array.from(segments)) {
+        segment.setAttribute('data-ask-parsed', 'true');
+    }
+
     const parsed = parseDOMTranscript(segments);
     store.set('transcript', parsed);
     store.set('fullTranscriptText', parsed.map((t) => `[${t.time}] ${t.text}`).join('\n'));
@@ -225,7 +233,7 @@ function pollForSegments(attempts = 0, forVideoId = state.currentVideoId): void 
     const ytPanel = document.querySelector(PANEL_SELECTOR);
     if (ytPanel) {
         const segments = ytPanel.querySelectorAll(SEGMENT_SELECTOR);
-        if (segments.length > 0) {
+        if (segments.length > 0 && !segments[0].hasAttribute('data-ask-parsed')) {
             handleDOMTranscript(segments);
             return;
         }
@@ -343,7 +351,10 @@ function resetForNewVideo(videoId: string): void {
 
     setTimeout(() => {
         if (state.currentVideoId === videoId) {
-            observeTranscriptPanel();
+            // Pass skipEagerCheck=true: after SPA navigation YouTube's DOM may still
+            // hold the previous video's transcript segments. Always wait for a fresh
+            // mutation rather than eagerly reading whatever is currently in the DOM.
+            observeTranscriptPanel(true);
             if (state.settings.auto_open_transcript) {
                 fetchTranscript();
             }

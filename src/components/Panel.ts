@@ -16,7 +16,7 @@ import { loadSettings, isProviderConfigured } from '@/services/state';
 import { ICONS } from '@/content/icons';
 import { createElement } from '@/content/selectors';
 import { makeDraggable } from '@/utils/drag';
-import { downloadTranscript } from '@/utils/download';
+import { downloadTranscript, copyTranscript } from '@/utils/download';
 import { isAutoGenerateEnabled } from '@/features/topics';
 
 export class Panel extends Component {
@@ -36,6 +36,9 @@ export class Panel extends Component {
         header.innerHTML = `
       <span class="yt-panel-title">Transcript</span>
       <span id="yt-token-count" class="yt-token-count"></span>
+      <button class="yt-icon-btn" id="yt-copy-btn" title="Copy transcript">
+        ${ICONS.COPY}
+      </button>
       <button class="yt-icon-btn" id="yt-download-btn" title="Download transcript">
         ${ICONS.DOWNLOAD}
       </button>
@@ -70,6 +73,7 @@ export class Panel extends Component {
 
         // Header events
         this.q('#yt-close-btn')?.addEventListener('click', () => this.hide(), { signal: this.signal });
+        this.q('#yt-copy-btn')?.addEventListener('click', () => copyTranscript(), { signal: this.signal });
         this.q('#yt-download-btn')?.addEventListener('click', () => downloadTranscript(), { signal: this.signal });
 
         // Tab switching

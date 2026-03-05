@@ -3,6 +3,19 @@ import { getVideoTitle } from '@/content/selectors';
 import { showToast } from '@/services/notifications';
 import { URL_REVOKE_DELAY_MS } from '@/utils/constants';
 
+export function copyTranscript(): void {
+    const { transcript } = state;
+    if (!transcript.length) {
+        showToast('Transcript not loaded yet.', 'error');
+        return;
+    }
+    const text = transcript.map((t) => `[${t.time}] ${t.text}`).join('\n');
+    navigator.clipboard.writeText(text).then(
+        () => showToast('Transcript copied!', 'info'),
+        () => showToast('Failed to copy transcript.', 'error'),
+    );
+}
+
 export function downloadTranscript(): void {
     const { transcript } = state;
     if (!transcript.length) {
