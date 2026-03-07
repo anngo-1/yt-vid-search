@@ -28,6 +28,10 @@ let panel: Panel | null = null;
 let fetchTimeout: ReturnType<typeof setTimeout> | null = null;
 let transcriptObserver: MutationObserver | null = null;
 let observingForVideoId: string | null = null;
+// Monotonically-increasing counter. Incremented on every resetForNewVideo and
+// every fresh fetchTranscript call. All async operations (observer, poll, retries)
+// capture the value at the time they start and bail out if it has changed.
+let fetchId = 0;
 
 const PANEL_SELECTOR = 'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]';
 const SEGMENT_SELECTOR = 'ytd-transcript-segment-renderer';
@@ -145,26 +149,16 @@ function destroyPanel(): void {
 
 // --- transcript reading via DOM observer ---
 
-function observeTranscriptPanel(skipEagerCheck = false): void {
+function observeTranscriptPanel(myFetchId: number): void {
     if (transcriptObserver) return;
 
-    // Snapshot the video ID so we can discard segments that arrive after a switch
     observingForVideoId = state.currentVideoId;
 
-    // Check if segments already exist (user had panel open) — but skip this on
-    // fresh navigation since YouTube's DOM may still hold the previous video's segments
-    if (!skipEagerCheck) {
-        const ytPanel = document.querySelector(PANEL_SELECTOR);
-        if (ytPanel) {
-            const segments = ytPanel.querySelectorAll(SEGMENT_SELECTOR);
-            if (segments.length > 0 && !segments[0].hasAttribute('data-ask-parsed')) {
-                handleDOMTranscript(segments);
-                return;
-            }
-        }
-    }
-
     transcriptObserver = new MutationObserver(() => {
+        if (fetchId !== myFetchId) {
+            disconnectObserver();
+            return;
+        }
         const ytPanel = document.querySelector(PANEL_SELECTOR);
         if (!ytPanel) return;
         const segments = ytPanel.querySelectorAll(SEGMENT_SELECTOR);
@@ -172,7 +166,7 @@ function observeTranscriptPanel(skipEagerCheck = false): void {
 
         transcriptObserver?.disconnect();
         transcriptObserver = null;
-        handleDOMTranscript(segments);
+        handleDOMTranscript(segments, myFetchId);
     });
 
     transcriptObserver.observe(document.body, { childList: true, subtree: true });
@@ -203,10 +197,13 @@ function parseDOMTranscript(segments: NodeListOf<Element>): TranscriptSegment[] 
     return result;
 }
 
-function handleDOMTranscript(segments: NodeListOf<Element>): void {
-    // Discard if the video changed since we started observing (stale DOM segments)
+function handleDOMTranscript(segments: NodeListOf<Element>, myFetchId: number): void {
+    // Discard if this observation belongs to an older fetch session
+    if (fetchId !== myFetchId) return;
+    // Discard if the video changed since we started observing
     if (observingForVideoId !== null && observingForVideoId !== state.currentVideoId) return;
-    if (!state.isOurFetch && !state.transcript.length) return; // ignore passive fires after timeout
+    // Only accept segments when we are the ones who initiated the fetch
+    if (!state.isOurFetch) return;
 
     for (const segment of Array.from(segments)) {
         segment.setAttribute('data-ask-parsed', 'true');
@@ -217,31 +214,30 @@ function handleDOMTranscript(segments: NodeListOf<Element>): void {
     store.set('fullTranscriptText', parsed.map((t) => `[${t.time}] ${t.text}`).join('\n'));
     clearFetchTimeout();
 
-    if (state.isOurFetch) {
-        disconnectObserver();
-        closeYouTubePanel();
-        createPanel();
-        store.set('isOurFetch', false);
-    }
+    disconnectObserver();
+    closeYouTubePanel();
+    createPanel();
+    store.set('isOurFetch', false);
 }
 
 /** Poll for segments after clicking the transcript button (active backup for the passive observer) */
-function pollForSegments(attempts = 0, forVideoId = state.currentVideoId): void {
+function pollForSegments(attempts = 0, forVideoId = state.currentVideoId, myFetchId = fetchId): void {
     if (!state.isOurFetch) return; // already completed or timed out
+    if (fetchId !== myFetchId) return; // fetch was superseded by a newer one
     if (forVideoId !== state.currentVideoId) return; // video changed, abort this poll chain
 
     const ytPanel = document.querySelector(PANEL_SELECTOR);
     if (ytPanel) {
         const segments = ytPanel.querySelectorAll(SEGMENT_SELECTOR);
         if (segments.length > 0 && !segments[0].hasAttribute('data-ask-parsed')) {
-            handleDOMTranscript(segments);
+            handleDOMTranscript(segments, myFetchId);
             return;
         }
     }
 
     if (attempts < 20) {
         // 20 × 400ms = 8s
-        setTimeout(() => pollForSegments(attempts + 1, forVideoId), 400);
+        setTimeout(() => pollForSegments(attempts + 1, forVideoId, myFetchId), 400);
     }
 }
 
@@ -250,14 +246,17 @@ function pollForSegments(attempts = 0, forVideoId = state.currentVideoId): void 
 const FETCH_MAX_RETRIES = 5;
 const FETCH_INITIAL_DELAY = 300;
 
-function fetchTranscript(retryCount = 0): void {
+function fetchTranscript(retryCount = 0, myFetchId = ++fetchId): void {
     if (retryCount === 0) {
         store.set('isOurFetch', true);
         clearFetchTimeout();
 
         fetchTimeout = setTimeout(() => {
-            if (state.isOurFetch) {
+            if (state.isOurFetch && fetchId === myFetchId) {
                 store.set('isOurFetch', false);
+                store.set('transcript', []);
+                store.set('fullTranscriptText', '');
+                disconnectObserver(); // clean up — no transcript arrived in time
                 if (panel) {
                     panel.getTab<TranscriptTab>('transcript')?.renderMessage('No transcript available for this video.');
                 } else {
@@ -273,27 +272,32 @@ function fetchTranscript(retryCount = 0): void {
     }
 
     setTimeout(() => {
+        // Bail out if this fetch was superseded by a newer one (e.g. video changed)
+        if (fetchId !== myFetchId) return;
+
         const transcriptBtn = document.querySelector<HTMLElement>(
             'button[aria-label*="transcript" i], button[aria-label*="Transcript" i]',
         );
 
         if (transcriptBtn) {
             transcriptBtn.click();
-            observeTranscriptPanel();
-            pollForSegments();
+            observeTranscriptPanel(myFetchId);
+            pollForSegments(0, state.currentVideoId, myFetchId);
             return;
         }
 
         if (retryCount >= FETCH_MAX_RETRIES) {
             clearFetchTimeout();
             store.set('isOurFetch', false);
+            store.set('transcript', []);
+            store.set('fullTranscriptText', '');
             showToast('Could not find transcript button. Try opening transcript manually.', 'error');
             return;
         }
 
         // YouTube's DOM may not be ready after SPA navigation, retry with backoff
         const delay = retryCount < 2 ? 500 : 1000;
-        setTimeout(() => fetchTranscript(retryCount + 1), delay);
+        setTimeout(() => fetchTranscript(retryCount + 1, myFetchId), delay);
     }, FETCH_INITIAL_DELAY);
 }
 
@@ -330,14 +334,18 @@ function setupNavigationListener(): void {
     };
 
     window.addEventListener('yt-navigate-finish', handleNavigation);
+    window.addEventListener('yt-page-data-updated', handleNavigation);
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
             handleNavigation();
         }
     });
+
+    handleNavigation();
 }
 
 function resetForNewVideo(videoId: string): void {
+    fetchId++; // invalidate any in-flight observer, poller, or retry callbacks
     clearFetchTimeout();
     disconnectObserver();
     store.set('isOurFetch', false);
@@ -351,10 +359,6 @@ function resetForNewVideo(videoId: string): void {
 
     setTimeout(() => {
         if (state.currentVideoId === videoId) {
-            // Pass skipEagerCheck=true: after SPA navigation YouTube's DOM may still
-            // hold the previous video's transcript segments. Always wait for a fresh
-            // mutation rather than eagerly reading whatever is currently in the DOM.
-            observeTranscriptPanel(true);
             if (state.settings.auto_open_transcript) {
                 fetchTranscript();
             }
@@ -366,6 +370,11 @@ function closeAndCleanup(): void {
     destroyPanel();
     store.set('currentVideoId', null);
     store.set('buttonVideoId', null);
+    store.set('transcript', []);
+    store.set('fullTranscriptText', '');
+    store.set('isOurFetch', false);
+    clearFetchTimeout();
+    disconnectObserver();
 }
 
 init();
