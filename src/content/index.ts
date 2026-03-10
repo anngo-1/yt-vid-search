@@ -178,6 +178,13 @@ function disconnectObserver(): void {
     observingForVideoId = null;
 }
 
+function clearParsedTranscriptMarkers(): void {
+    const parsedSegments = document.querySelectorAll(`${PANEL_SELECTOR} ${SEGMENT_SELECTOR}[data-ask-parsed]`);
+    for (const segment of Array.from(parsedSegments)) {
+        segment.removeAttribute('data-ask-parsed');
+    }
+}
+
 function parseDOMTranscript(segments: NodeListOf<Element>): TranscriptSegment[] {
     const result: TranscriptSegment[] = [];
     for (const segment of segments) {
@@ -257,6 +264,8 @@ function fetchTranscript(retryCount = 0, myFetchId = ++fetchId): void {
                 store.set('transcript', []);
                 store.set('fullTranscriptText', '');
                 disconnectObserver(); // clean up — no transcript arrived in time
+                closeYouTubePanel();
+                clearParsedTranscriptMarkers();
                 if (panel) {
                     panel.getTab<TranscriptTab>('transcript')?.renderMessage('No transcript available for this video.');
                 } else {
@@ -291,6 +300,8 @@ function fetchTranscript(retryCount = 0, myFetchId = ++fetchId): void {
             store.set('isOurFetch', false);
             store.set('transcript', []);
             store.set('fullTranscriptText', '');
+            closeYouTubePanel();
+            clearParsedTranscriptMarkers();
             showToast('Could not find transcript button. Try opening transcript manually.', 'error');
             return;
         }
@@ -309,12 +320,10 @@ function clearFetchTimeout(): void {
 }
 
 function closeYouTubePanel(): void {
-    const segmentPanel = document.querySelector(
-        'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]',
-    );
-    if (segmentPanel) {
+    const panels = document.querySelectorAll<HTMLElement>(PANEL_SELECTOR);
+    for (const segmentPanel of Array.from(panels)) {
         const closeBtn = segmentPanel.querySelector<HTMLElement>(
-            '#visibility-button button, tp-yt-icon-button#visibility-button',
+            '#visibility-button button, tp-yt-icon-button#visibility-button, button[aria-label*="Close" i]',
         );
         closeBtn?.click();
     }
@@ -348,6 +357,8 @@ function resetForNewVideo(videoId: string): void {
     fetchId++; // invalidate any in-flight observer, poller, or retry callbacks
     clearFetchTimeout();
     disconnectObserver();
+    closeYouTubePanel();
+    clearParsedTranscriptMarkers();
     store.set('isOurFetch', false);
 
     store.set('transcript', []);
@@ -368,6 +379,8 @@ function resetForNewVideo(videoId: string): void {
 
 function closeAndCleanup(): void {
     destroyPanel();
+    closeYouTubePanel();
+    clearParsedTranscriptMarkers();
     store.set('currentVideoId', null);
     store.set('buttonVideoId', null);
     store.set('transcript', []);
