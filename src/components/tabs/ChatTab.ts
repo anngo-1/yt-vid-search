@@ -10,7 +10,13 @@ import { store } from '@/services/store';
 import { renderMarkdown } from '@/utils/markdown';
 import { isProviderConfigured } from '@/services/state';
 import { streamCompletion, fetchOpenRouterContextLength } from '@/services/api';
-import { buildMessages, buildFullSystemPrompt, buildFollowUpSystemPrompt, shouldUseTools, estimateUsedTokens } from '@/features/chat';
+import {
+    buildMessages,
+    buildFullSystemPrompt,
+    buildFollowUpSystemPrompt,
+    shouldUseTools,
+    estimateUsedTokens,
+} from '@/features/chat';
 import type { Tool } from '@/types';
 import { resolveModel, resolveProvider } from '@/utils/llm';
 import { showToast } from '@/services/notifications';
@@ -19,6 +25,14 @@ import { ICONS } from '@/content/icons';
 
 export class ChatTab extends Component {
     private streamController: AbortController | null = null;
+
+    private persistChatHistory(): void {
+        try {
+            (chrome.storage.session ?? chrome.storage.local).set({ chatHistory: state.chatHistory });
+        } catch {
+            // Extension context can be invalidated during reload; ignore persistence failures.
+        }
+    }
 
     mount(parent: HTMLElement): void {
         this.el = document.createElement('div');
@@ -104,17 +118,32 @@ export class ChatTab extends Component {
         const model = resolveModel(state.settings, 'chat');
         const apiKey = state.settings.openrouter_api_key || '';
 
-        fetchOpenRouterContextLength(model, apiKey).then((maxTokens) => {
-            if (!maxTokens) { bar.style.display = 'none'; return; }
+        fetchOpenRouterContextLength(model, apiKey)
+            .then((maxTokens) => {
+                if (!maxTokens) {
+                    bar.style.display = 'none';
+                    return;
+                }
 
-            const pct = Math.min(100, Math.round((usedTokens / maxTokens) * 100));
-            const fmtK = (n: number) => n >= 1000 ? `${Math.round(n / 1000)}k` : String(n);
+                const pct = Math.min(100, Math.round((usedTokens / maxTokens) * 100));
+                const fmtK = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
 
-            bar.style.display = 'flex';
-            if (pct >= 90) { bar.setAttribute('data-critical', ''); } else { bar.removeAttribute('data-critical'); }
-            if (pct >= 75) { bar.setAttribute('data-high', ''); } else { bar.removeAttribute('data-high'); }
-            bar.innerHTML = `<span class="yt-context-bar-text">${fmtK(usedTokens)}&thinsp;/&thinsp;${fmtK(maxTokens)} <span class="yt-context-bar-pct">(${pct}%)</span></span>`;
-        }).catch(() => { bar.style.display = 'none'; });
+                bar.style.display = 'flex';
+                if (pct >= 90) {
+                    bar.setAttribute('data-critical', '');
+                } else {
+                    bar.removeAttribute('data-critical');
+                }
+                if (pct >= 75) {
+                    bar.setAttribute('data-high', '');
+                } else {
+                    bar.removeAttribute('data-high');
+                }
+                bar.innerHTML = `<span class="yt-context-bar-text">${fmtK(usedTokens)}&thinsp;/&thinsp;${fmtK(maxTokens)} <span class="yt-context-bar-pct">(${pct}%)</span></span>`;
+            })
+            .catch(() => {
+                bar.style.display = 'none';
+            });
     }
 
     // --- events ---
@@ -215,7 +244,7 @@ export class ChatTab extends Component {
         store.set('isChatCleared', false);
         this.addMessage('user', text);
         store.set('chatHistory', [...state.chatHistory, { role: 'user', content: text }]);
-        chrome.storage.session.set({ chatHistory: state.chatHistory });
+        this.persistChatHistory();
         this.updateContextBar();
 
         const noHistory = state.settings?.chat_no_history === true;
@@ -337,7 +366,7 @@ export class ChatTab extends Component {
                     'chatHistory',
                     currentMessages.filter((m) => m.role !== 'system'),
                 );
-                chrome.storage.session.set({ chatHistory: state.chatHistory });
+                this.persistChatHistory();
                 this.updateContextBar();
 
                 if (!response.tool_calls || response.tool_calls.length === 0) {
@@ -373,13 +402,17 @@ export class ChatTab extends Component {
                             try {
                                 const args = JSON.parse(tc.function.arguments);
                                 if (args.query) displayAction += ` for "${args.query}"`;
-                            } catch { /* ignore parse errors */ }
+                            } catch {
+                                /* ignore parse errors */
+                            }
                         } else if (toolName === 'read_transcript') {
                             displayAction = 'Reading transcript';
                             try {
                                 const args = JSON.parse(tc.function.arguments);
                                 if (args.start_seconds != null) displayAction += ` from ${args.start_seconds}s`;
-                            } catch { /* ignore parse errors */ }
+                            } catch {
+                                /* ignore parse errors */
+                            }
                         }
 
                         const toolStatusEl = document.createElement('div');
@@ -422,7 +455,7 @@ export class ChatTab extends Component {
                         'chatHistory',
                         currentMessages.filter((m) => m.role !== 'system'),
                     );
-                    chrome.storage.session.set({ chatHistory: state.chatHistory });
+                    this.persistChatHistory();
                 }
             }
         } catch (error) {
@@ -437,8 +470,8 @@ export class ChatTab extends Component {
                     error instanceof ApiError
                         ? `API Error: ${error.message}${error.status ? ` (${error.status})` : ''}`
                         : error instanceof Error
-                            ? error.message
-                            : 'Unknown error';
+                          ? error.message
+                          : 'Unknown error';
                 this.addMessage('system', `Error: ${msg}`);
             }
         } finally {

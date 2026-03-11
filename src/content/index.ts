@@ -17,8 +17,12 @@ import { getVideoId } from '@/content/selectors';
 import { Panel } from '@/components/Panel';
 import { TranscriptTab } from '@/components/tabs/TranscriptTab';
 import { clearRetryState, handleTranslationSync } from '@/features/translation';
-import { findActiveSegmentIndex } from '@/utils/transcript';
-import { timeToSeconds } from '@/utils/time';
+import {
+    findActiveSegmentIndex,
+    parsePanelTranscript,
+    parseTimedTextTranscript,
+    parseTranscript,
+} from '@/utils/transcript';
 import { isOpenPanelMessage } from '@/services/validators';
 import { showToast } from '@/services/notifications';
 import { TRANSCRIPT_FETCH_TIMEOUT_MS } from '@/utils/constants';
@@ -26,19 +30,29 @@ import type { TranscriptSegment } from '@/types';
 
 let panel: Panel | null = null;
 let fetchTimeout: ReturnType<typeof setTimeout> | null = null;
-let transcriptObserver: MutationObserver | null = null;
-let observingForVideoId: string | null = null;
 // Monotonically-increasing counter. Incremented on every resetForNewVideo and
-// every fresh fetchTranscript call. All async operations (observer, poll, retries)
+// every fresh fetchTranscript call. Async retries and response handlers
 // capture the value at the time they start and bail out if it has changed.
 let fetchId = 0;
 
 const PANEL_SELECTOR = 'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]';
-const SEGMENT_SELECTOR = 'ytd-transcript-segment-renderer';
+const TIMEDTEXT_EVENT = 'ask-transcript:timedtext';
+
+function ensureSessionStorage(): void {
+    const storageWithSession = chrome.storage as typeof chrome.storage & {
+        session?: chrome.storage.StorageArea;
+    };
+    if (!storageWithSession.session) {
+        storageWithSession.session = chrome.storage.local;
+    }
+}
 
 function init(): void {
+    ensureSessionStorage();
     loadSettings();
+    injectTimedTextInterceptor();
     setupEventListeners();
+    setupTimedTextListener();
     setupNavigationListener();
     setupErrorBoundary();
 }
@@ -147,105 +161,90 @@ function destroyPanel(): void {
     panel = null;
 }
 
-// --- transcript reading via DOM observer ---
+function handleTranscript(parsed: TranscriptSegment[], myFetchId: number): void {
+    if (fetchId !== myFetchId || !state.isOurFetch) return;
+    if (!parsed.length) return;
 
-function observeTranscriptPanel(myFetchId: number): void {
-    if (transcriptObserver) return;
-
-    observingForVideoId = state.currentVideoId;
-
-    transcriptObserver = new MutationObserver(() => {
-        if (fetchId !== myFetchId) {
-            disconnectObserver();
-            return;
-        }
-        const ytPanel = document.querySelector(PANEL_SELECTOR);
-        if (!ytPanel) return;
-        const segments = ytPanel.querySelectorAll(SEGMENT_SELECTOR);
-        if (segments.length === 0 || segments[0].hasAttribute('data-ask-parsed')) return;
-
-        transcriptObserver?.disconnect();
-        transcriptObserver = null;
-        handleDOMTranscript(segments, myFetchId);
-    });
-
-    transcriptObserver.observe(document.body, { childList: true, subtree: true });
-}
-
-function disconnectObserver(): void {
-    transcriptObserver?.disconnect();
-    transcriptObserver = null;
-    observingForVideoId = null;
-}
-
-function clearParsedTranscriptMarkers(): void {
-    const parsedSegments = document.querySelectorAll(`${PANEL_SELECTOR} ${SEGMENT_SELECTOR}[data-ask-parsed]`);
-    for (const segment of Array.from(parsedSegments)) {
-        segment.removeAttribute('data-ask-parsed');
-    }
-}
-
-function parseDOMTranscript(segments: NodeListOf<Element>): TranscriptSegment[] {
-    const result: TranscriptSegment[] = [];
-    for (const segment of segments) {
-        // YouTube renders timestamp in first yt-formatted-string, text in second
-        const formattedStrings = segment.querySelectorAll('yt-formatted-string');
-        const timeEl = segment.querySelector('[class*="timestamp"]') ?? formattedStrings[0];
-        const textEl =
-            formattedStrings.length > 1 ? formattedStrings[formattedStrings.length - 1] : formattedStrings[0];
-
-        const time = timeEl?.textContent?.trim() ?? '';
-        const text = textEl?.textContent?.trim() ?? '';
-        if (!text || text === time) continue; // skip if only timestamp found
-
-        const seconds = timeToSeconds(time);
-        result.push({ time, seconds, text });
-    }
-    return result;
-}
-
-function handleDOMTranscript(segments: NodeListOf<Element>, myFetchId: number): void {
-    // Discard if this observation belongs to an older fetch session
-    if (fetchId !== myFetchId) return;
-    // Discard if the video changed since we started observing
-    if (observingForVideoId !== null && observingForVideoId !== state.currentVideoId) return;
-    // Only accept segments when we are the ones who initiated the fetch
-    if (!state.isOurFetch) return;
-
-    for (const segment of Array.from(segments)) {
-        segment.setAttribute('data-ask-parsed', 'true');
-    }
-
-    const parsed = parseDOMTranscript(segments);
     store.set('transcript', parsed);
     store.set('fullTranscriptText', parsed.map((t) => `[${t.time}] ${t.text}`).join('\n'));
     clearFetchTimeout();
 
-    disconnectObserver();
     closeYouTubePanel();
     createPanel();
     store.set('isOurFetch', false);
 }
 
-/** Poll for segments after clicking the transcript button (active backup for the passive observer) */
-function pollForSegments(attempts = 0, forVideoId = state.currentVideoId, myFetchId = fetchId): void {
-    if (!state.isOurFetch) return; // already completed or timed out
-    if (fetchId !== myFetchId) return; // fetch was superseded by a newer one
-    if (forVideoId !== state.currentVideoId) return; // video changed, abort this poll chain
+function setupTimedTextListener(): void {
+    window.addEventListener(TIMEDTEXT_EVENT, ((event: Event) => {
+        const customEvent = event as CustomEvent<{ url?: string; body?: string }>;
+        const { url, body } = customEvent.detail ?? {};
+        if (!url || !body || !state.isOurFetch) return;
 
-    const ytPanel = document.querySelector(PANEL_SELECTOR);
-    if (ytPanel) {
-        const segments = ytPanel.querySelectorAll(SEGMENT_SELECTOR);
-        if (segments.length > 0 && !segments[0].hasAttribute('data-ask-parsed')) {
-            handleDOMTranscript(segments, myFetchId);
-            return;
+        try {
+            const requestUrl = new URL(url, window.location.href);
+            const raw = JSON.parse(body) as unknown;
+
+            if (requestUrl.pathname.includes('/api/timedtext')) {
+                const videoId = requestUrl.searchParams.get('v');
+                if (videoId && videoId === state.currentVideoId) {
+                    const parsed = parseTimedTextTranscript(raw);
+                    handleTranscript(parsed, fetchId);
+                }
+                return;
+            }
+
+            if (requestUrl.pathname.includes('/youtubei/v1/get_transcript')) {
+                const parsed = parseTranscript(raw);
+                handleTranscript(parsed, fetchId);
+                return;
+            }
+
+            if (requestUrl.pathname.includes('/youtubei/v1/get_panel')) {
+                const parsed = parsePanelTranscript(raw);
+                handleTranscript(parsed, fetchId);
+            }
+        } catch {
+            // ignore malformed timedtext payloads and wait for timeout
+        }
+    }) as EventListener);
+}
+
+function injectTimedTextInterceptor(): void {
+    if (document.getElementById('ask-transcript-timedtext-interceptor')) return;
+    if (!chrome?.runtime?.id) return;
+
+    let interceptorUrl = '';
+    try {
+        interceptorUrl = chrome.runtime.getURL('timedtext-interceptor.js');
+    } catch {
+        return;
+    }
+
+    const script = document.createElement('script');
+    script.id = 'ask-transcript-timedtext-interceptor';
+    script.src = interceptorUrl;
+    script.dataset.eventName = TIMEDTEXT_EVENT;
+    script.addEventListener('load', () => script.remove());
+    script.addEventListener('error', () => script.remove());
+
+    (document.documentElement || document.head || document.body).appendChild(script);
+}
+
+function clickTranscriptButton(): boolean {
+    const directSelectors = [
+        'button[aria-label*="transcript" i]',
+        'button[aria-label*="Show transcript" i]',
+        'ytd-video-description-transcript-section-renderer button',
+    ];
+
+    for (const selector of directSelectors) {
+        const button = document.querySelector<HTMLElement>(selector);
+        if (button) {
+            button.click();
+            return true;
         }
     }
-
-    if (attempts < 20) {
-        // 20 × 400ms = 8s
-        setTimeout(() => pollForSegments(attempts + 1, forVideoId, myFetchId), 400);
-    }
+    return false;
 }
 
 // --- transcript fetching ---
@@ -263,9 +262,7 @@ function fetchTranscript(retryCount = 0, myFetchId = ++fetchId): void {
                 store.set('isOurFetch', false);
                 store.set('transcript', []);
                 store.set('fullTranscriptText', '');
-                disconnectObserver(); // clean up — no transcript arrived in time
                 closeYouTubePanel();
-                clearParsedTranscriptMarkers();
                 if (panel) {
                     panel.getTab<TranscriptTab>('transcript')?.renderMessage('No transcript available for this video.');
                 } else {
@@ -284,16 +281,11 @@ function fetchTranscript(retryCount = 0, myFetchId = ++fetchId): void {
         // Bail out if this fetch was superseded by a newer one (e.g. video changed)
         if (fetchId !== myFetchId) return;
 
-        const transcriptBtn = document.querySelector<HTMLElement>(
-            'button[aria-label*="transcript" i], button[aria-label*="Transcript" i]',
-        );
-
-        if (transcriptBtn) {
-            transcriptBtn.click();
-            observeTranscriptPanel(myFetchId);
-            pollForSegments(0, state.currentVideoId, myFetchId);
+        if (clickTranscriptButton()) {
             return;
         }
+
+        if (!state.isOurFetch || fetchId !== myFetchId) return;
 
         if (retryCount >= FETCH_MAX_RETRIES) {
             clearFetchTimeout();
@@ -301,7 +293,6 @@ function fetchTranscript(retryCount = 0, myFetchId = ++fetchId): void {
             store.set('transcript', []);
             store.set('fullTranscriptText', '');
             closeYouTubePanel();
-            clearParsedTranscriptMarkers();
             showToast('Could not find transcript button. Try opening transcript manually.', 'error');
             return;
         }
@@ -356,9 +347,7 @@ function setupNavigationListener(): void {
 function resetForNewVideo(videoId: string): void {
     fetchId++; // invalidate any in-flight observer, poller, or retry callbacks
     clearFetchTimeout();
-    disconnectObserver();
     closeYouTubePanel();
-    clearParsedTranscriptMarkers();
     store.set('isOurFetch', false);
 
     store.set('transcript', []);
@@ -380,14 +369,12 @@ function resetForNewVideo(videoId: string): void {
 function closeAndCleanup(): void {
     destroyPanel();
     closeYouTubePanel();
-    clearParsedTranscriptMarkers();
     store.set('currentVideoId', null);
     store.set('buttonVideoId', null);
     store.set('transcript', []);
     store.set('fullTranscriptText', '');
     store.set('isOurFetch', false);
     clearFetchTimeout();
-    disconnectObserver();
 }
 
 init();

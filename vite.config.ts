@@ -6,6 +6,7 @@ const copyPlugin = {
     name: 'copy-extension-files',
     closeBundle() {
         copyFileSync('manifest.json', 'dist/manifest.json');
+        copyFileSync('src/content/timedtext-interceptor.js', 'dist/timedtext-interceptor.js');
 
         let popupHtml = readFileSync('popup.html', 'utf-8');
         popupHtml = popupHtml.replace('src/popup/index.ts', 'popup.js');

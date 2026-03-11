@@ -4,6 +4,7 @@
 
 import type { TranscriptSegment } from '@/types';
 import { TranscriptParseError } from '@/services/errors';
+import { timeToSeconds } from '@/utils/time';
 
 interface TranscriptSegmentRenderer {
     startTimeText: { simpleText: string };
@@ -33,6 +34,41 @@ interface YouTubeTranscriptResponse {
     }>;
 }
 
+interface TimedTextJson3Seg {
+    utf8?: string;
+}
+
+interface TimedTextJson3Event {
+    tStartMs?: number;
+    segs?: TimedTextJson3Seg[];
+}
+
+interface TimedTextJson3Response {
+    events?: TimedTextJson3Event[];
+}
+
+interface PanelSegmentCandidate {
+    time: string;
+    text: string;
+}
+
+function formatTimestampFromSeconds(seconds: number): string {
+    if (!Number.isFinite(seconds) || seconds < 0) {
+        return '0:00';
+    }
+
+    const total = Math.floor(seconds);
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const secs = total % 60;
+
+    if (hours > 0) {
+        return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    return `${minutes}:${String(secs).padStart(2, '0')}`;
+}
+
 /** parse youtube transcript api response into segments */
 export function parseTranscript(json: unknown): TranscriptSegment[] {
     try {
@@ -57,6 +93,86 @@ export function parseTranscript(json: unknown): TranscriptSegment[] {
     } catch {
         throw new TranscriptParseError('Failed to parse transcript data', json);
     }
+}
+
+/** Parse timedtext json3 payload from YouTube's captions API. */
+export function parseTimedTextTranscript(json: unknown): TranscriptSegment[] {
+    const data = json as TimedTextJson3Response | null | undefined;
+    if (!Array.isArray(data?.events)) {
+        return [];
+    }
+
+    return data.events
+        .map((event) => {
+            const ms = typeof event.tStartMs === 'number' ? event.tStartMs : Number(event.tStartMs);
+            const seconds = Number.isFinite(ms) ? ms / 1000 : 0;
+            const text =
+                event.segs
+                    ?.map((segment) => segment.utf8 ?? '')
+                    .join('')
+                    .replace(/\s+/g, ' ')
+                    .trim() ?? '';
+
+            return {
+                time: formatTimestampFromSeconds(seconds),
+                seconds,
+                text,
+            };
+        })
+        .filter((segment) => segment.text !== '');
+}
+
+/** Parse YouTube modern transcript payload from youtubei/v1/get_panel. */
+export function parsePanelTranscript(json: unknown): TranscriptSegment[] {
+    const candidates: PanelSegmentCandidate[] = [];
+    const seen = new Set<string>();
+
+    const visit = (node: unknown, inheritedTimestamp = ''): void => {
+        if (!node || typeof node !== 'object') return;
+
+        if (Array.isArray(node)) {
+            for (const item of node) {
+                visit(item, inheritedTimestamp);
+            }
+            return;
+        }
+
+        const obj = node as Record<string, unknown>;
+        let nextTimestamp = inheritedTimestamp;
+
+        const timeline = obj.timelineItemViewModel as Record<string, unknown> | undefined;
+        if (timeline && typeof timeline.timestamp === 'string') {
+            nextTimestamp = timeline.timestamp;
+        }
+
+        const segment = obj.transcriptSegmentViewModel as Record<string, unknown> | undefined;
+        if (segment) {
+            const time =
+                (typeof segment.timestamp === 'string' ? segment.timestamp : '') ||
+                (typeof obj.timestamp === 'string' ? obj.timestamp : '') ||
+                nextTimestamp;
+            const text = typeof segment.simpleText === 'string' ? segment.simpleText.replace(/\s+/g, ' ').trim() : '';
+            if (time && text) {
+                const key = `${time}|${text}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    candidates.push({ time, text });
+                }
+            }
+        }
+
+        for (const value of Object.values(obj)) {
+            visit(value, nextTimestamp);
+        }
+    };
+
+    visit(json);
+
+    return candidates.map((segment) => ({
+        time: segment.time,
+        seconds: timeToSeconds(segment.time),
+        text: segment.text,
+    }));
 }
 
 /**
