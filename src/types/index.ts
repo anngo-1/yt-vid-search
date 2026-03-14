@@ -153,6 +153,8 @@ export interface AppState {
     // chat
     chatHistory: ChatMessage[];
     isChatCleared: boolean;
+    chatWindowStart: number; // seconds, 0 = beginning
+    chatWindowEnd: number; // seconds, 0 = end of transcript (no cap)
 
     // topics
     topicsData: TopicsData | null;
@@ -199,6 +201,8 @@ export function createInitialState(): AppState {
         // chat
         chatHistory: [],
         isChatCleared: false,
+        chatWindowStart: 0,
+        chatWindowEnd: 0,
 
         // topics
         topicsData: null,

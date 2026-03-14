@@ -52,7 +52,7 @@ interface PanelSegmentCandidate {
     text: string;
 }
 
-function formatTimestampFromSeconds(seconds: number): string {
+export function formatTimestampFromSeconds(seconds: number): string {
     if (!Number.isFinite(seconds) || seconds < 0) {
         return '0:00';
     }

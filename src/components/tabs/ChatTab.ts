@@ -16,12 +16,14 @@ import {
     buildFollowUpSystemPrompt,
     shouldUseTools,
     estimateUsedTokens,
+    getWindowedTranscript,
 } from '@/features/chat';
 import type { Tool } from '@/types';
 import { resolveModel, resolveProvider } from '@/utils/llm';
 import { showToast } from '@/services/notifications';
 import { ApiError } from '@/services/errors';
 import { ICONS } from '@/content/icons';
+import { formatTimestampFromSeconds } from '@/utils/transcript';
 
 export class ChatTab extends Component {
     private streamController: AbortController | null = null;
@@ -44,6 +46,17 @@ export class ChatTab extends Component {
         <div class="yt-context-bar" id="yt-context-bar" style="display:none"></div>
         <button id="yt-chat-clear" class="yt-link-btn">Clear</button>
       </div>
+      <div class="yt-time-window">
+        <div class="yt-time-window-label">
+          <span id="yt-tw-start">0:00</span>
+          <span class="yt-time-window-title">Context window</span>
+          <span id="yt-tw-end">0:00</span>
+        </div>
+        <div class="yt-dual-range">
+          <input type="range" id="yt-tw-min" min="0" max="100" value="0" step="1">
+          <input type="range" id="yt-tw-max" min="0" max="100" value="100" step="1">
+        </div>
+      </div>
       <div id="yt-key-warning" class="yt-key-warning" style="display:none"></div>
       <div id="yt-chat-messages" class="yt-chat-messages"></div>
       <div class="yt-ask-bar">
@@ -53,6 +66,7 @@ export class ChatTab extends Component {
         parent.appendChild(this.el);
 
         this.bindEvents();
+        this.initTimeWindow();
 
         // Restore chat history
         state.chatHistory.forEach((msg) => {
@@ -146,6 +160,80 @@ export class ChatTab extends Component {
             });
     }
 
+    // --- time window ---
+
+    private getMaxSeconds(): number {
+        const segs = state.transcript;
+        return segs.length ? segs[segs.length - 1].seconds : 0;
+    }
+
+    private initTimeWindow(): void {
+        const maxSec = this.getMaxSeconds();
+        const minSlider = this.q<HTMLInputElement>('#yt-tw-min');
+        const maxSlider = this.q<HTMLInputElement>('#yt-tw-max');
+        if (!minSlider || !maxSlider || maxSec === 0) return;
+
+        minSlider.max = String(maxSec);
+        maxSlider.max = String(maxSec);
+        minSlider.value = String(state.chatWindowStart);
+        maxSlider.value = state.chatWindowEnd === 0 ? String(maxSec) : String(state.chatWindowEnd);
+
+        this.updateTimeLabels();
+        this.updateRangeTrack();
+    }
+
+    private updateTimeLabels(): void {
+        const minSlider = this.q<HTMLInputElement>('#yt-tw-min');
+        const maxSlider = this.q<HTMLInputElement>('#yt-tw-max');
+        const startLabel = this.q('#yt-tw-start');
+        const endLabel = this.q('#yt-tw-end');
+        if (!minSlider || !maxSlider || !startLabel || !endLabel) return;
+
+        startLabel.textContent = formatTimestampFromSeconds(Number(minSlider.value));
+        endLabel.textContent = formatTimestampFromSeconds(Number(maxSlider.value));
+    }
+
+    private updateRangeTrack(): void {
+        const minSlider = this.q<HTMLInputElement>('#yt-tw-min');
+        const maxSlider = this.q<HTMLInputElement>('#yt-tw-max');
+        const container = this.q<HTMLElement>('.yt-dual-range');
+        if (!minSlider || !maxSlider || !container) return;
+
+        const max = Number(minSlider.max) || 1;
+        const lo = Number(minSlider.value) / max * 100;
+        const hi = Number(maxSlider.value) / max * 100;
+        container.style.setProperty('--lo', `${lo}%`);
+        container.style.setProperty('--hi', `${hi}%`);
+    }
+
+    private onSliderChange = (e: Event): void => {
+        const minSlider = this.q<HTMLInputElement>('#yt-tw-min');
+        const maxSlider = this.q<HTMLInputElement>('#yt-tw-max');
+        if (!minSlider || !maxSlider) return;
+
+        let lo = Number(minSlider.value);
+        let hi = Number(maxSlider.value);
+
+        // Prevent crossover
+        if (lo > hi) {
+            const target = e.target as HTMLInputElement;
+            if (target === minSlider) {
+                lo = hi;
+                minSlider.value = String(lo);
+            } else {
+                hi = lo;
+                maxSlider.value = String(hi);
+            }
+        }
+
+        const maxSec = this.getMaxSeconds();
+        store.set('chatWindowStart', lo);
+        store.set('chatWindowEnd', hi >= maxSec ? 0 : hi);
+
+        this.updateTimeLabels();
+        this.updateRangeTrack();
+    };
+
     // --- events ---
 
     private bindEvents(): void {
@@ -176,6 +264,10 @@ export class ChatTab extends Component {
         );
 
         this.q('#yt-chat-clear')?.addEventListener('click', () => this.clear(), { signal: this.signal });
+
+        // Time window sliders
+        this.q('#yt-tw-min')?.addEventListener('input', this.onSliderChange, { signal: this.signal });
+        this.q('#yt-tw-max')?.addEventListener('input', this.onSliderChange, { signal: this.signal });
 
         // Timestamp click → seek
         this.q('#yt-chat-messages')?.addEventListener(
@@ -213,9 +305,10 @@ export class ChatTab extends Component {
     private async executeTool(name: string, argsRaw: string): Promise<string> {
         try {
             const args = JSON.parse(argsRaw);
+            const windowedSegs = getWindowedTranscript();
             if (name === 'search_transcript') {
                 const query = args.query.toLowerCase();
-                const results = state.transcript.filter((s) => s.text.toLowerCase().includes(query)).slice(0, 15);
+                const results = windowedSegs.filter((s) => s.text.toLowerCase().includes(query)).slice(0, 15);
                 if (!results.length) return 'No matches found.';
                 return results.map((s) => `[${s.time}] ${s.text}`).join('\n');
             } else if (name === 'read_transcript') {
@@ -225,7 +318,7 @@ export class ChatTab extends Component {
                 const validDuration = Math.min(Math.max(duration, 10), 300);
                 const endSeconds = startSeconds + validDuration;
 
-                const results = state.transcript.filter((s) => s.seconds >= startSeconds && s.seconds <= endSeconds);
+                const results = windowedSegs.filter((s) => s.seconds >= startSeconds && s.seconds <= endSeconds);
                 if (!results.length) return 'No transcript found in that time range.';
                 return results.map((s) => `[${s.time}] ${s.text}`).join('\n');
             }

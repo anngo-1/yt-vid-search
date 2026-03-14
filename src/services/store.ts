@@ -59,6 +59,8 @@ export class Store {
         this.set('topicsVideoId', null);
         this.set('topicsData', null);
         this.set('isChatCleared', false);
+        this.set('chatWindowStart', 0);
+        this.set('chatWindowEnd', 0);
         this.set('transcriptOffset', 0);
         this.set('captionsEnabled', false);
         this.set('translationEnabled', false);

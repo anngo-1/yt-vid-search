@@ -7,9 +7,21 @@
 import { state } from '@/services/state';
 import { getVideoTitle } from '@/content/selectors';
 import type { ChatMessage } from '@/types';
+import { formatTimestampFromSeconds } from '@/utils/transcript';
 
 /** Auto-inline transcript for videos up to ~30k chars (~6k tokens). */
 const TRANSCRIPT_INLINE_CHARS = 30_000;
+
+/** Return transcript segments filtered by the chat time-window (if set). */
+export function getWindowedTranscript(): import('@/types').TranscriptSegment[] {
+    const segs = state.transcript;
+    if (!segs.length) return segs;
+    const start = state.chatWindowStart;
+    const end = state.chatWindowEnd;
+    if (start === 0 && end === 0) return segs; // full range
+    const effectiveEnd = end === 0 ? Infinity : end;
+    return segs.filter((s) => s.seconds >= start && s.seconds <= effectiveEnd);
+}
 
 function getInlineTranscript(): string | null {
     if (!state.transcript.length) return null;
@@ -17,13 +29,19 @@ function getInlineTranscript(): string | null {
     if (!directMode && (!state.fullTranscriptText || state.fullTranscriptText.length > TRANSCRIPT_INLINE_CHARS)) {
         return null;
     }
-    return state.transcript.map((s) => `[${s.time}] ${s.text}`).join('\n');
+    return getWindowedTranscript()
+        .map((s) => `[${s.time}] ${s.text}`)
+        .join('\n');
 }
 
 /** Returns true when tool calls should be sent to the API. */
 export function shouldUseTools(): boolean {
     if (state.settings?.chat_direct_mode === true) return false;
-    if (state.fullTranscriptText && state.fullTranscriptText.length <= TRANSCRIPT_INLINE_CHARS) return false;
+    // When a time window is active, the windowed text may fit inline even if the full transcript doesn't
+    const windowedText = getWindowedTranscript()
+        .map((s) => `[${s.time}] ${s.text}`)
+        .join('\n');
+    if (windowedText.length <= TRANSCRIPT_INLINE_CHARS) return false;
     return true;
 }
 
@@ -76,15 +94,25 @@ TOOL USE RULES:
 - If searches return 0 results, fall back to read_transcript to scan the relevant time range directly.
 - Prefer breadth: multiple short parallel searches beat one long sequential chain.`;
 
+function getWindowNote(): string {
+    const start = state.chatWindowStart;
+    const end = state.chatWindowEnd;
+    if (start === 0 && end === 0) return '';
+    const startStr = formatTimestampFromSeconds(start);
+    const endStr = end === 0 ? 'end' : formatTimestampFromSeconds(end);
+    return `\nNote: The user has restricted context to the time window ${startStr} – ${endStr}. Only answer based on content within this window.\n`;
+}
+
 export function buildFullSystemPrompt(): string {
     const title = getVideoTitle();
     const inlineTranscript = getInlineTranscript();
+    const windowNote = getWindowNote();
 
     if (inlineTranscript) {
         return `You are an expert at analyzing video transcripts. You are helping a user understand a YouTube video titled "${title}".
 
-The full transcript is provided below. Answer questions directly from it.
-
+The transcript below covers the user's selected time window. Answer questions directly from it.
+${windowNote}
 ## Transcript
 ${inlineTranscript}
 
@@ -95,7 +123,7 @@ ${TIMESTAMP_RULES}`;
     return `You are an expert at analyzing video transcripts. You are helping a user understand a YouTube video titled "${title}".
 
 You have access to tools that let you search the video transcript for specific keywords and read segments of the transcript. Use them to gather information before answering the user's questions accurately.
-
+${windowNote}
 ${TOOL_RULES}
 
 RESPONSE RULES:
@@ -105,12 +133,13 @@ ${TIMESTAMP_RULES}`;
 export function buildFollowUpSystemPrompt(): string {
     const title = getVideoTitle();
     const inlineTranscript = getInlineTranscript();
+    const windowNote = getWindowNote();
 
     if (inlineTranscript) {
         return `You are an expert at analyzing video transcripts. You are helping a user understand a YouTube video titled "${title}".
 
-The full transcript is provided below. Answer questions directly from it.
-
+The transcript below covers the user's selected time window. Answer questions directly from it.
+${windowNote}
 ## Transcript
 ${inlineTranscript}
 
@@ -121,7 +150,7 @@ ${TIMESTAMP_RULES}`;
     return `You are an expert at analyzing video transcripts. You are helping a user understand a YouTube video titled "${title}".
 
 You have access to tools that let you search the video transcript for specific keywords and read segments of the transcript. Use them to gather information before answering the user's questions accurately.
-
+${windowNote}
 ${TOOL_RULES}
 
 RESPONSE RULES:
