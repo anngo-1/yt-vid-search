@@ -209,7 +209,7 @@ export function createInitialState(): AppState {
         topicsVideoId: null,
 
         // transcript sync
-        autoSync: true,
+        autoSync: false,
         transcriptOffset: 0,
         lastActiveSegmentIndex: undefined,
 

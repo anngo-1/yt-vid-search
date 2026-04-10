@@ -12,7 +12,7 @@ describe('Store', () => {
         expect(store.get('currentVideoId')).toBeNull();
         expect(store.get('transcript')).toEqual([]);
         expect(store.get('captionFontSize')).toBe(48);
-        expect(store.get('autoSync')).toBe(true);
+        expect(store.get('autoSync')).toBe(false);
     });
 
     it('set() updates state values', () => {
@@ -129,7 +129,7 @@ describe('Store', () => {
 
         store.notify('autoSync');
 
-        expect(calls).toEqual([true]);
+        expect(calls).toEqual([false]);
     });
 
     it('notify() does nothing when no listeners registered', () => {
@@ -140,7 +140,7 @@ describe('Store', () => {
         const custom = new Store({ currentVideoId: 'init-vid', captionFontSize: 30 });
         expect(custom.get('currentVideoId')).toBe('init-vid');
         expect(custom.get('captionFontSize')).toBe(30);
-        expect(custom.get('autoSync')).toBe(true); // default preserved
+        expect(custom.get('autoSync')).toBe(false); // default preserved
     });
 
     describe('mutate()', () => {

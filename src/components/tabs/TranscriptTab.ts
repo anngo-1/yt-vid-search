@@ -359,9 +359,9 @@ export class TranscriptTab extends Component {
       </div>
       <div class="yt-expandable-row">
         <span class="yt-label-small">Sync</span>
-        <button class="yt-sync-btn active" id="yt-sync-btn">
+        <button class="yt-sync-btn" id="yt-sync-btn">
           ${ICONS.SYNC}
-          <span id="yt-sync-status">Sync ON</span>
+          <span id="yt-sync-status">Sync OFF</span>
         </button>
       </div>
       <div class="yt-expandable-row">
