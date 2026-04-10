@@ -121,18 +121,12 @@ export class Panel extends Component {
     }
 
     hide(): void {
-        if (this.el) {
-            this.el.style.opacity = '0';
-            this.el.style.pointerEvents = 'none';
-        }
+        if (this.el) this.el.style.display = 'none';
         store.set('panelOpen', false);
     }
 
     show(): void {
-        if (this.el) {
-            this.el.style.opacity = '1';
-            this.el.style.pointerEvents = 'auto';
-        }
+        if (this.el) this.el.style.display = 'flex';
         store.set('panelOpen', true);
     }
 

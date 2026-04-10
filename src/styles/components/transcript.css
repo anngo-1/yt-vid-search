@@ -21,6 +21,8 @@
     padding: var(--yt-spacing-lg) var(--yt-spacing-xl);
     border-bottom: 1px solid var(--yt-border-color);
     cursor: pointer;
+    content-visibility: auto;
+    contain-intrinsic-size: 0 68px;
 }
 
 .yt-row:hover {

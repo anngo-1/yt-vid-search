@@ -9,6 +9,12 @@
 
     const shouldCapture = (rawUrl) => {
         if (!rawUrl) return false;
+        if (
+            !rawUrl.includes('get_panel') &&
+            !rawUrl.includes('get_transcript') &&
+            !rawUrl.includes('timedtext')
+        )
+            return false;
         try {
             const url = new URL(rawUrl, window.location.href);
             if (url.pathname.includes('/youtubei/v1/get_panel')) return true;
@@ -25,22 +31,22 @@
     };
 
     const originalFetch = window.fetch;
-    window.fetch = async function (...args) {
-        const response = await originalFetch.apply(this, args);
-        try {
-            const request = args[0];
-            const requestUrl = typeof request === 'string' ? request : request?.url;
-            if (shouldCapture(requestUrl)) {
-                response
-                    .clone()
-                    .text()
-                    .then((body) => emit(requestUrl, body))
-                    .catch(() => {});
-            }
-        } catch {
-            // no-op
+    window.fetch = function (...args) {
+        const request = args[0];
+        const requestUrl = typeof request === 'string' ? request : request?.url;
+
+        if (!shouldCapture(requestUrl)) {
+            return originalFetch.apply(this, args);
         }
-        return response;
+
+        return originalFetch.apply(this, args).then(function (response) {
+            response
+                .clone()
+                .text()
+                .then(function (body) { emit(requestUrl, body); })
+                .catch(function () {});
+            return response;
+        });
     };
 
     const originalOpen = XMLHttpRequest.prototype.open;
@@ -56,15 +62,17 @@
     };
 
     XMLHttpRequest.prototype.send = function (...args) {
-        this.addEventListener('load', function () {
-            const url = this.__askTimedTextUrl;
-            if (!shouldCapture(url)) return;
-            try {
-                emit(url, this.responseText || '');
-            } catch {
-                // no-op
-            }
-        });
+        const url = this.__askTimedTextUrl;
+        if (shouldCapture(url)) {
+            const capturedUrl = url;
+            this.addEventListener('load', function () {
+                try {
+                    emit(capturedUrl, this.responseText || '');
+                } catch {
+                    // no-op
+                }
+            });
+        }
         return originalSend.apply(this, args);
     };
 })();

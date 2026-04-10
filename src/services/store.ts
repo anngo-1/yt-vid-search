@@ -27,14 +27,20 @@ export class Store {
         const prev = this._state[key];
         this._state[key] = value;
         if (prev !== value) {
-            this._listeners.get(key as string)?.forEach((fn) => fn(value, prev));
+            const listeners = this._listeners.get(key as string);
+            if (listeners) {
+                for (const fn of listeners) fn(value, prev);
+            }
         }
     }
 
     /** Force-notify listeners after in-place mutation of a value (Set, Object, etc.) */
     notify<K extends keyof AppState>(key: K): void {
         const value = this._state[key];
-        this._listeners.get(key as string)?.forEach((fn) => fn(value, value));
+        const listeners = this._listeners.get(key as string);
+        if (listeners) {
+            for (const fn of listeners) fn(value, value);
+        }
     }
 
     /** Mutate a value in-place and automatically notify listeners */

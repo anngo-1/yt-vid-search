@@ -18,7 +18,7 @@ import {
     setTranslationRowUpdater,
 } from '@/features/translation';
 
-const RENDER_CHUNK_SIZE = 200;
+const RENDER_CHUNK_SIZE = 500;
 
 export class TranscriptTab extends Component {
     private rowCache: HTMLElement[] | null = null;
@@ -124,7 +124,7 @@ export class TranscriptTab extends Component {
         if (next !== -1 && this.rowCache[next]) {
             const row = this.rowCache[next];
             row.classList.add('active');
-            if (state.autoSync && state.panelOpen) {
+            if (state.autoSync && state.panelOpen && !isInView(row, this.q('#yt-transcript-rows'))) {
                 row.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
@@ -419,6 +419,13 @@ function rowHtml(t: { seconds: number; time: string; text: string }): string {
       <div class="yt-time">${escapeHtml(t.time)}</div>
       <div class="yt-text">${escapeHtml(t.text)}</div>
     </div>`;
+}
+
+function isInView(el: HTMLElement, container: HTMLElement | null): boolean {
+    if (!container) return false;
+    const elRect = el.getBoundingClientRect();
+    const cRect = container.getBoundingClientRect();
+    return elRect.top >= cRect.top && elRect.bottom <= cRect.bottom;
 }
 
 function childElements(container: HTMLElement): HTMLElement[] {

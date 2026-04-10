@@ -128,11 +128,11 @@ function updateActiveSegment(seconds: number): void {
 
     if (index !== (state.lastActiveSegmentIndex ?? -1)) {
         store.set('lastActiveSegmentIndex', index);
-    }
 
-    // Translation prefetch
-    if (state.translationEnabled && index !== -1) {
-        handleTranslationSync(index);
+        // Translation prefetch — only needed when the segment actually changes
+        if (state.translationEnabled && index !== -1) {
+            handleTranslationSync(index);
+        }
     }
 }
 
