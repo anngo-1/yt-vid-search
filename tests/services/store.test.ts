@@ -90,8 +90,11 @@ describe('Store', () => {
         store.set('settings', { provider: 'openrouter', openrouter_api_key: 'key123' });
         store.set('currentVideoId', 'old-video');
         store.set('chatHistory', [{ role: 'user', content: 'hello' }]);
+        store.set('fullTranscriptText', '[0:00] stale transcript');
         store.set('captionFontSize', 60);
         store.set('topicsData', { topics: [] });
+        store.set('panelOpen', true);
+        store.set('isOurFetch', true);
 
         store.reset('new-video');
 
@@ -99,6 +102,9 @@ describe('Store', () => {
         expect(store.get('chatHistory')).toEqual([]);
         expect(store.get('topicsData')).toBeNull();
         expect(store.get('transcript')).toEqual([]);
+        expect(store.get('fullTranscriptText')).toBe('');
+        expect(store.get('panelOpen')).toBe(false);
+        expect(store.get('isOurFetch')).toBe(false);
         // Settings and font size should be preserved
         expect(store.get('settings').openrouter_api_key).toBe('key123');
         expect(store.get('captionFontSize')).toBe(60);

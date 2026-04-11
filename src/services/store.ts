@@ -60,6 +60,8 @@ export class Store {
         this.set('currentVideoId', videoId);
         this.set('transcript', []);
         this.set('fullTranscriptText', '');
+        this.set('panelOpen', false);
+        this.set('isOurFetch', false);
         this.set('chatHistory', []);
         this.set('buttonVideoId', null);
         this.set('topicsVideoId', null);
