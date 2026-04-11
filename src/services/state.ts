@@ -22,6 +22,7 @@ export function loadSettings(): Promise<Settings> {
                 ...STORAGE_KEYS,
                 'captionFontSize',
                 'captionBackgroundEnabled',
+                'autoSync',
                 'targetLanguage',
                 'captionPosition',
                 'captionSize',
@@ -29,6 +30,9 @@ export function loadSettings(): Promise<Settings> {
             chrome.storage.local.get(keys, (data: Record<string, unknown>) => {
                 store.set('settings', normalizeSettings(data));
 
+                if (isBoolean(data.autoSync)) {
+                    store.set('autoSync', data.autoSync);
+                }
                 if (isFiniteNumber(data.captionFontSize)) {
                     store.set('captionFontSize', clamp(data.captionFontSize, 20, 80));
                 }

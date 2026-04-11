@@ -210,6 +210,7 @@ export class TranscriptTab extends Component {
             offLabel: 'Sync OFF',
             onToggle: (enabled) => {
                 store.set('autoSync', enabled);
+                persistSetting({ autoSync: enabled });
                 if (enabled) {
                     const idx = state.lastActiveSegmentIndex;
                     if (idx !== undefined && idx !== -1 && this.rowCache?.[idx]) {
