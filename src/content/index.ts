@@ -281,6 +281,24 @@ function fetchTranscript(retryCount = 0, myFetchId = ++fetchId): void {
         // Bail out if this fetch was superseded by a newer one (e.g. video changed)
         if (fetchId !== myFetchId) return;
 
+        // YouTube's DOM might still show the old video during SPA navigation.
+        // Wait until the main video container updates to the expected ID.
+        const flexyId = document.querySelector('ytd-watch-flexy')?.getAttribute('video-id');
+        if (flexyId && flexyId !== state.currentVideoId) {
+            if (retryCount >= FETCH_MAX_RETRIES) {
+                clearFetchTimeout();
+                store.set('isOurFetch', false);
+                store.set('transcript', []);
+                store.set('fullTranscriptText', '');
+                closeYouTubePanel();
+                showToast('Could not find transcript button for this video.', 'error');
+                return;
+            }
+            const delay = retryCount < 2 ? 500 : 1000;
+            setTimeout(() => fetchTranscript(retryCount + 1, myFetchId), delay);
+            return;
+        }
+
         if (clickTranscriptButton()) {
             return;
         }
@@ -335,6 +353,7 @@ function setupNavigationListener(): void {
 
     window.addEventListener('yt-navigate-finish', handleNavigation);
     window.addEventListener('yt-page-data-updated', handleNavigation);
+    window.addEventListener('popstate', handleNavigation);
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
             handleNavigation();
