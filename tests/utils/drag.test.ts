@@ -61,6 +61,12 @@ describe('makeDraggable', () => {
         // Set viewport size since jsdom defaults to 0
         Object.defineProperty(window, 'innerWidth', { value: 1920, writable: true, configurable: true });
         Object.defineProperty(window, 'innerHeight', { value: 1080, writable: true, configurable: true });
+
+        vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+            cb(0);
+            return 1;
+        }) as typeof requestAnimationFrame);
+        vi.stubGlobal('cancelAnimationFrame', vi.fn());
     });
 
     afterEach(() => {
@@ -75,11 +81,11 @@ describe('makeDraggable', () => {
         document.dispatchEvent(new MouseEvent('mousemove', { clientX: 200, clientY: 250, bubbles: true }));
 
         // startLeft=100, startTop=100, dx=200-150=50, dy=250-150=100
-        expect(panel.style.left).toBe('150px');
-        expect(panel.style.top).toBe('200px');
+        expect(panel.style.left).toBe('100px');
+        expect(panel.style.top).toBe('100px');
         expect(panel.style.right).toBe('auto');
         expect(panel.style.bottom).toBe('auto');
-        expect(panel.style.transform).toBe('none');
+        expect(panel.style.transform).toBe('translate3d(50px, 100px, 0)');
     });
 
     it('mousedown + mousemove clamps to viewport boundaries', () => {
@@ -90,8 +96,9 @@ describe('makeDraggable', () => {
         // Move far to the left (negative) - should clamp left to 0
         document.dispatchEvent(new MouseEvent('mousemove', { clientX: -500, clientY: -500, bubbles: true }));
 
-        expect(panel.style.left).toBe('0px');
-        expect(panel.style.top).toBe('0px');
+        expect(panel.style.left).toBe('100px');
+        expect(panel.style.top).toBe('100px');
+        expect(panel.style.transform).toBe('translate3d(-100px, -100px, 0)');
     });
 
     it('mousedown + mousemove clamps to right/bottom viewport edge', () => {
@@ -103,8 +110,9 @@ describe('makeDraggable', () => {
         document.dispatchEvent(new MouseEvent('mousemove', { clientX: 5000, clientY: 5000, bubbles: true }));
 
         // Max left = 1920 - 400 = 1520, max top = 1080 - 300 = 780
-        expect(panel.style.left).toBe('1520px');
-        expect(panel.style.top).toBe('780px');
+        expect(panel.style.left).toBe('100px');
+        expect(panel.style.top).toBe('100px');
+        expect(panel.style.transform).toBe('translate3d(1420px, 680px, 0)');
     });
 
     it('mouseup calls onDragEnd with center position and cleans up listeners', () => {
@@ -115,9 +123,6 @@ describe('makeDraggable', () => {
 
         // Move panel
         document.dispatchEvent(new MouseEvent('mousemove', { clientX: 200, clientY: 200, bubbles: true }));
-
-        // After drag, getBoundingClientRect returns the "final" position
-        panel.getBoundingClientRect = () => makeBoundingRect({ left: 150, top: 150, right: 550, bottom: 450 });
 
         document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
 
@@ -220,10 +225,9 @@ describe('makeDraggable', () => {
         );
 
         // startLeft=100, startTop=100, dx=50, dy=100
-        expect(panel.style.left).toBe('150px');
-        expect(panel.style.top).toBe('200px');
-
-        panel.getBoundingClientRect = () => makeBoundingRect({ left: 150, top: 200, right: 550, bottom: 500 });
+        expect(panel.style.left).toBe('100px');
+        expect(panel.style.top).toBe('100px');
+        expect(panel.style.transform).toBe('translate3d(50px, 100px, 0)');
 
         document.dispatchEvent(
             new MockTouchEvent('touchend', { bubbles: true, changedTouches: [{ clientX: 200, clientY: 250 }] }),
@@ -253,8 +257,9 @@ describe('makeDraggable', () => {
         handle.dispatchEvent(new MouseEvent('mousedown', { clientX: 150, clientY: 150, bubbles: true }));
         document.dispatchEvent(new MouseEvent('mousemove', { clientX: 200, clientY: 200, bubbles: true }));
 
-        expect(panel.style.left).toBe('150px');
-        expect(panel.style.top).toBe('150px');
+        expect(panel.style.left).toBe('100px');
+        expect(panel.style.top).toBe('100px');
+        expect(panel.style.transform).toBe('translate3d(50px, 50px, 0)');
     });
 });
 

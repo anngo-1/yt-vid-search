@@ -67,9 +67,28 @@ export function makeDraggable(
         startY = 0,
         startLeft = 0,
         startTop = 0;
+    let panelWidth = 0,
+        panelHeight = 0;
+    let currentDx = 0,
+        currentDy = 0;
+    let pendingFrame: number | null = null;
+
+    const flushDragFrame = () => {
+        if (pendingFrame !== null) {
+            cancelAnimationFrame(pendingFrame);
+            pendingFrame = null;
+        }
+    };
+
+    const applyDragTransform = () => {
+        pendingFrame = null;
+        panel.style.transform = `translate3d(${currentDx}px, ${currentDy}px, 0)`;
+    };
 
     const drag = createDragCleanup(signal, () => {
+        flushDragFrame();
         handle.style.cursor = 'grab';
+        panel.style.willChange = '';
     });
 
     const onStart = (e: Event): void => {
@@ -90,12 +109,17 @@ export function makeDraggable(
         startY = pointer.clientY;
         startLeft = rect.left;
         startTop = rect.top;
+        panelWidth = rect.width;
+        panelHeight = rect.height;
+        currentDx = 0;
+        currentDy = 0;
 
         panel.style.right = 'auto';
         panel.style.bottom = 'auto';
         panel.style.left = startLeft + 'px';
         panel.style.top = startTop + 'px';
-        panel.style.transform = 'none';
+        panel.style.transform = 'translate3d(0, 0, 0)';
+        panel.style.willChange = 'transform';
         e.preventDefault();
 
         drag.attach(
@@ -103,16 +127,26 @@ export function makeDraggable(
                 if (!isPointerEvent(e)) return;
                 if ('touches' in e) e.preventDefault();
                 const p = getPointer(e);
-                const newLeft = Math.max(0, Math.min(window.innerWidth - rect.width, startLeft + p.clientX - startX));
-                const newTop = Math.max(0, Math.min(window.innerHeight - rect.height, startTop + p.clientY - startY));
-                panel.style.left = newLeft + 'px';
-                panel.style.top = newTop + 'px';
+                const newLeft = Math.max(0, Math.min(window.innerWidth - panelWidth, startLeft + p.clientX - startX));
+                const newTop = Math.max(0, Math.min(window.innerHeight - panelHeight, startTop + p.clientY - startY));
+                currentDx = newLeft - startLeft;
+                currentDy = newTop - startTop;
+
+                if (pendingFrame === null) {
+                    pendingFrame = requestAnimationFrame(applyDragTransform);
+                }
             },
             () => {
-                const finalRect = panel.getBoundingClientRect();
+                flushDragFrame();
+                const finalLeft = startLeft + currentDx;
+                const finalTop = startTop + currentDy;
+                panel.style.left = finalLeft + 'px';
+                panel.style.top = finalTop + 'px';
+                panel.style.transform = 'none';
+                panel.style.willChange = '';
                 onDragEnd?.({
-                    centerX: finalRect.left + finalRect.width / 2,
-                    centerY: finalRect.top + finalRect.height / 2,
+                    centerX: finalLeft + panelWidth / 2,
+                    centerY: finalTop + panelHeight / 2,
                 });
                 drag.cleanup();
                 handle.style.cursor = 'grab';
