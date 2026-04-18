@@ -6,21 +6,86 @@
 
 import { state } from '@/services/state';
 import { getVideoTitle } from '@/content/selectors';
-import type { ChatMessage } from '@/types';
+import type { ChatMessage, TranscriptSegment } from '@/types';
 import { formatTimestampFromSeconds } from '@/utils/transcript';
 
 /** Auto-inline transcript for videos up to ~30k chars (~6k tokens). */
 const TRANSCRIPT_INLINE_CHARS = 30_000;
 
+const windowedTranscriptCache: {
+    transcript: TranscriptSegment[] | null;
+    start: number;
+    end: number;
+    segments: TranscriptSegment[];
+    text: string | null;
+} = {
+    transcript: null,
+    start: 0,
+    end: 0,
+    segments: [],
+    text: null,
+};
+
+function isFullTranscriptWindow(start: number, end: number): boolean {
+    return start === 0 && end === 0;
+}
+
+function buildTranscriptText(segments: TranscriptSegment[]): string {
+    return segments.map((s) => `[${s.time}] ${s.text}`).join('\n');
+}
+
 /** Return transcript segments filtered by the chat time-window (if set). */
-export function getWindowedTranscript(): import('@/types').TranscriptSegment[] {
+export function getWindowedTranscript(): TranscriptSegment[] {
     const segs = state.transcript;
     if (!segs.length) return segs;
     const start = state.chatWindowStart;
     const end = state.chatWindowEnd;
-    if (start === 0 && end === 0) return segs; // full range
+
+    if (
+        windowedTranscriptCache.transcript === segs &&
+        windowedTranscriptCache.start === start &&
+        windowedTranscriptCache.end === end
+    ) {
+        return windowedTranscriptCache.segments;
+    }
+
+    if (isFullTranscriptWindow(start, end)) {
+        windowedTranscriptCache.transcript = segs;
+        windowedTranscriptCache.start = start;
+        windowedTranscriptCache.end = end;
+        windowedTranscriptCache.segments = segs;
+        windowedTranscriptCache.text = state.fullTranscriptText || null;
+        return segs;
+    }
+
     const effectiveEnd = end === 0 ? Infinity : end;
-    return segs.filter((s) => s.seconds >= start && s.seconds <= effectiveEnd);
+    const filtered = segs.filter((s) => s.seconds >= start && s.seconds <= effectiveEnd);
+    windowedTranscriptCache.transcript = segs;
+    windowedTranscriptCache.start = start;
+    windowedTranscriptCache.end = end;
+    windowedTranscriptCache.segments = filtered;
+    windowedTranscriptCache.text = null;
+    return filtered;
+}
+
+function getWindowedTranscriptText(): string {
+    const segs = getWindowedTranscript();
+    if (!segs.length) return '';
+
+    const start = state.chatWindowStart;
+    const end = state.chatWindowEnd;
+    if (isFullTranscriptWindow(start, end) && state.fullTranscriptText) {
+        windowedTranscriptCache.text = state.fullTranscriptText;
+        return state.fullTranscriptText;
+    }
+
+    if (windowedTranscriptCache.text !== null) {
+        return windowedTranscriptCache.text;
+    }
+
+    const text = buildTranscriptText(segs);
+    windowedTranscriptCache.text = text;
+    return text;
 }
 
 function getInlineTranscript(): string | null {
@@ -29,20 +94,14 @@ function getInlineTranscript(): string | null {
     if (!directMode && (!state.fullTranscriptText || state.fullTranscriptText.length > TRANSCRIPT_INLINE_CHARS)) {
         return null;
     }
-    return getWindowedTranscript()
-        .map((s) => `[${s.time}] ${s.text}`)
-        .join('\n');
+    return getWindowedTranscriptText();
 }
 
 /** Returns true when tool calls should be sent to the API. */
 export function shouldUseTools(): boolean {
     if (state.settings?.chat_direct_mode === true) return false;
     // When a time window is active, the windowed text may fit inline even if the full transcript doesn't
-    const windowedText = getWindowedTranscript()
-        .map((s) => `[${s.time}] ${s.text}`)
-        .join('\n');
-    if (windowedText.length <= TRANSCRIPT_INLINE_CHARS) return false;
-    return true;
+    return getWindowedTranscriptText().length > TRANSCRIPT_INLINE_CHARS;
 }
 
 export function buildMessages(systemPrompt: string, chatHistory: ChatMessage[]): ChatMessage[] {
@@ -64,7 +123,7 @@ export function estimateUsedTokens(): number {
 
     // Add transcript chars when it would be inlined in the system prompt
     const directMode = state.settings?.chat_direct_mode === true;
-    const transcriptChars = state.fullTranscriptText?.length ?? 0;
+    const transcriptChars = getWindowedTranscriptText().length;
     if (transcriptChars > 0 && (directMode || transcriptChars <= TRANSCRIPT_INLINE_CHARS)) {
         totalChars += transcriptChars;
     }

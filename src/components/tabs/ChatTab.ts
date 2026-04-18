@@ -308,7 +308,13 @@ export class ChatTab extends Component {
             const windowedSegs = getWindowedTranscript();
             if (name === 'search_transcript') {
                 const query = args.query.toLowerCase();
-                const results = windowedSegs.filter((s) => s.text.toLowerCase().includes(query)).slice(0, 15);
+                const results: typeof windowedSegs = [];
+                for (const segment of windowedSegs) {
+                    if (segment.text.toLowerCase().includes(query)) {
+                        results.push(segment);
+                        if (results.length === 15) break;
+                    }
+                }
                 if (!results.length) return 'No matches found.';
                 return results.map((s) => `[${s.time}] ${s.text}`).join('\n');
             } else if (name === 'read_transcript') {
@@ -318,7 +324,12 @@ export class ChatTab extends Component {
                 const validDuration = Math.min(Math.max(duration, 10), 300);
                 const endSeconds = startSeconds + validDuration;
 
-                const results = windowedSegs.filter((s) => s.seconds >= startSeconds && s.seconds <= endSeconds);
+                const results: typeof windowedSegs = [];
+                for (const segment of windowedSegs) {
+                    if (segment.seconds < startSeconds) continue;
+                    if (segment.seconds > endSeconds) break;
+                    results.push(segment);
+                }
                 if (!results.length) return 'No transcript found in that time range.';
                 return results.map((s) => `[${s.time}] ${s.text}`).join('\n');
             }

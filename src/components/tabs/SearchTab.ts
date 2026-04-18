@@ -10,6 +10,10 @@ import { SEARCH_DEBOUNCE_MS } from '@/utils/constants';
 
 export class SearchTab extends Component {
     private searchTimeout: number | null = null;
+    private searchCache: { transcript: typeof state.transcript | null; lowered: string[] } = {
+        transcript: null,
+        lowered: [],
+    };
 
     mount(parent: HTMLElement): void {
         this.el = document.createElement('div');
@@ -82,8 +86,24 @@ export class SearchTab extends Component {
             return;
         }
 
+        if (this.searchCache.transcript !== transcript) {
+            this.searchCache.transcript = transcript;
+            this.searchCache.lowered = transcript.map((t) => t.text.toLowerCase());
+        }
+
         const q = query.toLowerCase();
-        const matches = transcript.filter((t) => t.text.toLowerCase().includes(q));
+        const matches: Array<{ time: string; seconds: number; text: string; lowered: string }> = [];
+        for (let i = 0; i < transcript.length; i++) {
+            const lowered = this.searchCache.lowered[i];
+            if (lowered.includes(q)) {
+                matches.push({
+                    time: transcript[i].time,
+                    seconds: transcript[i].seconds,
+                    text: transcript[i].text,
+                    lowered,
+                });
+            }
+        }
 
         if (!matches.length) {
             container.innerHTML = '<div class="yt-empty">no matches found</div>';
@@ -103,7 +123,7 @@ export class SearchTab extends Component {
 
             const textDiv = document.createElement('div');
             textDiv.className = 'yt-text';
-            highlightText(textDiv, m.text, query);
+            highlightText(textDiv, m.text, query, m.lowered);
 
             row.append(timeDiv, textDiv);
             container.appendChild(row);
@@ -112,12 +132,12 @@ export class SearchTab extends Component {
 }
 
 /** Highlight query matches using DOM nodes (safe against XSS) */
-function highlightText(container: HTMLElement, text: string, query: string): void {
-    const lowerText = text.toLowerCase();
+function highlightText(container: HTMLElement, text: string, query: string, lowerText?: string): void {
+    const normalizedText = lowerText ?? text.toLowerCase();
     const lowerQuery = query.toLowerCase();
     let lastIndex = 0;
 
-    let pos = lowerText.indexOf(lowerQuery, lastIndex);
+    let pos = normalizedText.indexOf(lowerQuery, lastIndex);
     while (pos !== -1) {
         if (pos > lastIndex) {
             container.appendChild(document.createTextNode(text.slice(lastIndex, pos)));
@@ -126,7 +146,7 @@ function highlightText(container: HTMLElement, text: string, query: string): voi
         mark.textContent = text.slice(pos, pos + query.length);
         container.appendChild(mark);
         lastIndex = pos + query.length;
-        pos = lowerText.indexOf(lowerQuery, lastIndex);
+        pos = normalizedText.indexOf(lowerQuery, lastIndex);
     }
 
     if (lastIndex < text.length) {
