@@ -7,13 +7,12 @@ import { registerTab } from '@/components/tabs/registry';
 import { state } from '@/services/state';
 import { seekTo } from '@/content/selectors';
 import { SEARCH_DEBOUNCE_MS } from '@/utils/constants';
+import { searchTranscriptSegments } from '@/utils/transcript-derived';
 
 export class SearchTab extends Component {
     private searchTimeout: number | null = null;
-    private searchCache: { transcript: typeof state.transcript | null; lowered: string[] } = {
-        transcript: null,
-        lowered: [],
-    };
+    private lastRenderedQuery = '';
+    private lastRenderedTranscript: typeof state.transcript | null = null;
 
     mount(parent: HTMLElement): void {
         this.el = document.createElement('div');
@@ -86,24 +85,13 @@ export class SearchTab extends Component {
             return;
         }
 
-        if (this.searchCache.transcript !== transcript) {
-            this.searchCache.transcript = transcript;
-            this.searchCache.lowered = transcript.map((t) => t.text.toLowerCase());
+        if (this.lastRenderedQuery === query && this.lastRenderedTranscript === transcript) {
+            return;
         }
+        this.lastRenderedQuery = query;
+        this.lastRenderedTranscript = transcript;
 
-        const q = query.toLowerCase();
-        const matches: Array<{ time: string; seconds: number; text: string; lowered: string }> = [];
-        for (let i = 0; i < transcript.length; i++) {
-            const lowered = this.searchCache.lowered[i];
-            if (lowered.includes(q)) {
-                matches.push({
-                    time: transcript[i].time,
-                    seconds: transcript[i].seconds,
-                    text: transcript[i].text,
-                    lowered,
-                });
-            }
-        }
+        const matches = searchTranscriptSegments(transcript, query);
 
         if (!matches.length) {
             container.innerHTML = '<div class="yt-empty">no matches found</div>';
@@ -111,6 +99,7 @@ export class SearchTab extends Component {
         }
 
         container.innerHTML = `<div class="yt-result-count">${matches.length} result${matches.length === 1 ? '' : 's'}</div>`;
+        const fragment = document.createDocumentFragment();
 
         for (const m of matches) {
             const row = document.createElement('div');
@@ -123,11 +112,13 @@ export class SearchTab extends Component {
 
             const textDiv = document.createElement('div');
             textDiv.className = 'yt-text';
-            highlightText(textDiv, m.text, query, m.lowered);
+            highlightText(textDiv, m.text, query, m.text.toLowerCase());
 
             row.append(timeDiv, textDiv);
-            container.appendChild(row);
+            fragment.appendChild(row);
         }
+
+        container.appendChild(fragment);
     }
 }
 

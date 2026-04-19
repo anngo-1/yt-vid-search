@@ -24,6 +24,7 @@ import { showToast } from '@/services/notifications';
 import { ApiError } from '@/services/errors';
 import { ICONS } from '@/content/icons';
 import { formatTimestampFromSeconds } from '@/utils/transcript';
+import { readTranscriptRange, searchTranscriptSegments } from '@/utils/transcript-derived';
 
 export class ChatTab extends Component {
     private streamController: AbortController | null = null;
@@ -307,14 +308,7 @@ export class ChatTab extends Component {
             const args = JSON.parse(argsRaw);
             const windowedSegs = getWindowedTranscript();
             if (name === 'search_transcript') {
-                const query = args.query.toLowerCase();
-                const results: typeof windowedSegs = [];
-                for (const segment of windowedSegs) {
-                    if (segment.text.toLowerCase().includes(query)) {
-                        results.push(segment);
-                        if (results.length === 15) break;
-                    }
-                }
+                const results = searchTranscriptSegments(windowedSegs, args.query, 15);
                 if (!results.length) return 'No matches found.';
                 return results.map((s) => `[${s.time}] ${s.text}`).join('\n');
             } else if (name === 'read_transcript') {
@@ -324,12 +318,7 @@ export class ChatTab extends Component {
                 const validDuration = Math.min(Math.max(duration, 10), 300);
                 const endSeconds = startSeconds + validDuration;
 
-                const results: typeof windowedSegs = [];
-                for (const segment of windowedSegs) {
-                    if (segment.seconds < startSeconds) continue;
-                    if (segment.seconds > endSeconds) break;
-                    results.push(segment);
-                }
+                const results = readTranscriptRange(windowedSegs, startSeconds, endSeconds);
                 if (!results.length) return 'No transcript found in that time range.';
                 return results.map((s) => `[${s.time}] ${s.text}`).join('\n');
             }
