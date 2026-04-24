@@ -7,9 +7,9 @@
 
 import { Component } from '@/components/Component';
 import { CaptionOverlay } from '@/components/CaptionOverlay';
-import { TAB_REGISTRY } from '@/components/tabs/registry';
-import { ChatTab } from '@/components/tabs/ChatTab';
-import { TopicsTab } from '@/components/tabs/TopicsTab';
+import { TAB_REGISTRY, type TabDefinition } from '@/components/tabs/registry';
+import type { ChatTab } from '@/components/tabs/ChatTab';
+import type { TopicsTab } from '@/components/tabs/TopicsTab';
 import { state } from '@/services/state';
 import { store } from '@/services/store';
 import { loadSettings, isProviderConfigured } from '@/services/state';
@@ -21,8 +21,10 @@ import { isAutoGenerateEnabled } from '@/features/topics';
 
 export class Panel extends Component {
     private tabs = new Map<string, Component>();
+    private tabViews = new Map<string, HTMLElement>();
     private activeTabId = '';
     private captionOverlay: CaptionOverlay | null = null;
+    private contentEl: HTMLElement | null = null;
 
     mount(parent: HTMLElement): void {
         if (document.getElementById('yt-custom-panel') || state.panelCreating) return;
@@ -63,13 +65,14 @@ export class Panel extends Component {
 
         makeDraggable(this.el, header, this.signal);
 
-        // Mount all tabs
-        TAB_REGISTRY.forEach((def, i) => {
-            const tab = def.create();
-            tab.mount(content);
-            this.tabs.set(def.id, tab);
-            if (i === 0) this.activeTabId = def.id;
-        });
+        this.contentEl = content;
+
+        // Mount the initial tab only; the rest are created on first activation.
+        const initialTab = TAB_REGISTRY[0];
+        if (initialTab) {
+            this.activeTabId = initialTab.id;
+            this.mountTab(initialTab, content);
+        }
 
         // Header events
         this.q('#yt-close-btn')?.addEventListener('click', () => this.hide(), { signal: this.signal });
@@ -133,6 +136,8 @@ export class Panel extends Component {
     unmount(): void {
         this.tabs.forEach((tab) => tab.unmount());
         this.tabs.clear();
+        this.tabViews.clear();
+        this.contentEl = null;
         this.captionOverlay?.unmount();
         this.captionOverlay = null;
         store.set('panelOpen', false);
@@ -147,6 +152,30 @@ export class Panel extends Component {
 
     // --- private ---
 
+    private mountTab(defOrId: TabDefinition | string, content = this.contentEl): Component | undefined {
+        if (!content) return undefined;
+
+        const def = typeof defOrId === 'string' ? TAB_REGISTRY.find((d) => d.id === defOrId) : defOrId;
+        if (!def) return undefined;
+
+        const existing = this.tabs.get(def.id);
+        if (existing) return existing;
+
+        const childCount = content.children.length;
+        const tab = def.create();
+        tab.mount(content);
+        this.tabs.set(def.id, tab);
+
+        const view = content.children[childCount];
+        if (view instanceof HTMLElement) {
+            view.classList.toggle('active', def.id === this.activeTabId);
+            this.tabViews.set(def.id, view);
+        }
+
+        this.updateKeyWarningForTab(def.id, tab);
+        return tab;
+    }
+
     private async initialize(): Promise<void> {
         await loadSettings();
         this.updateTokenCount();
@@ -160,7 +189,7 @@ export class Panel extends Component {
 
         // Auto-generate topics if configured
         if (state.transcript.length && isProviderConfigured() && isAutoGenerateEnabled()) {
-            const topicsTab = this.getTab<TopicsTab>('topics');
+            const topicsTab = this.mountTab('topics') as TopicsTab | undefined;
             topicsTab?.generate();
         }
     }
@@ -168,6 +197,7 @@ export class Panel extends Component {
     private switchTab(id: string, tabBar: HTMLElement, content: HTMLElement): void {
         if (id === this.activeTabId) return;
         this.activeTabId = id;
+        this.mountTab(id, content);
 
         // Update tab bar buttons
         tabBar.querySelectorAll('.yt-tab').forEach((btn) => {
@@ -175,8 +205,8 @@ export class Panel extends Component {
         });
 
         // Show/hide views
-        content.querySelectorAll('.yt-view').forEach((view, i) => {
-            view.classList.toggle('active', TAB_REGISTRY[i]?.id === id);
+        this.tabViews.forEach((view, viewId) => {
+            view.classList.toggle('active', viewId === id);
         });
 
         // Fire onActivate callback
@@ -203,5 +233,16 @@ export class Panel extends Component {
 
         const topicsTab = this.getTab<TopicsTab>('topics');
         topicsTab?.updateKeyWarning(message);
+    }
+
+    private updateKeyWarningForTab(id: string, tab: Component): void {
+        const configured = isProviderConfigured();
+        const message = configured ? '' : '⚠️ No API key configured. Set one in the extension popup.';
+
+        if (id === 'ask') {
+            (tab as ChatTab).updateKeyWarning(message);
+        } else if (id === 'topics') {
+            (tab as TopicsTab).updateKeyWarning(message);
+        }
     }
 }

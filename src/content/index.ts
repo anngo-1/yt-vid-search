@@ -106,6 +106,8 @@ function setupEventListeners(): void {
     };
 
     const syncEvent = (e: Event) => {
+        if (!state.panelOpen && !state.captionsEnabled) return;
+
         const video = e.target as HTMLVideoElement;
         if (video.tagName !== 'VIDEO') return;
         lastVideo = video;

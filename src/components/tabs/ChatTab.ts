@@ -400,10 +400,11 @@ export class ChatTab extends Component {
                 let renderTimeout: number | null = null;
                 let pendingRaf: number | null = null;
                 let receivedFirstChunk = false;
+                let streamedContent = '';
 
                 const doRender = () => {
                     pendingRaf = null;
-                    msgEl.innerHTML = renderMarkdown(msgEl.dataset.content || '');
+                    msgEl.innerHTML = renderMarkdown(streamedContent);
                     container.scrollTop = container.scrollHeight;
                     lastRender = Date.now();
                 };
@@ -420,7 +421,7 @@ export class ChatTab extends Component {
                             receivedFirstChunk = true;
                             msgEl.innerHTML = '';
                         }
-                        msgEl.dataset.content = (msgEl.dataset.content || '') + chunk;
+                        streamedContent += chunk;
 
                         // Skip if a render is already scheduled (RAF or timeout)
                         if (pendingRaf !== null || renderTimeout !== null) return;
