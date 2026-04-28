@@ -61,7 +61,7 @@ export class ChatTab extends Component {
       <div id="yt-key-warning" class="yt-key-warning" style="display:none"></div>
       <div id="yt-chat-messages" class="yt-chat-messages"></div>
       <div class="yt-ask-bar">
-        <input id="yt-ask-input" class="yt-input" placeholder="Ask about the video..." autocomplete="off">
+        <textarea id="yt-ask-input" class="yt-input" placeholder="Ask about the video..." autocomplete="off" rows="1"></textarea>
         <button id="yt-ask-send">${ICONS.SEND}</button>
       </div>`;
         parent.appendChild(this.el);
@@ -238,8 +238,15 @@ export class ChatTab extends Component {
     // --- events ---
 
     private bindEvents(): void {
-        const input = this.q<HTMLInputElement>('#yt-ask-input');
+        const input = this.q<HTMLTextAreaElement>('#yt-ask-input');
         const sendBtn = this.q('#yt-ask-send');
+
+        const resizeInput = () => {
+            if (!input) return;
+            input.style.height = 'auto';
+            input.style.height = `${Math.min(input.scrollHeight, 144)}px`;
+            input.style.overflowY = input.scrollHeight > 144 ? 'auto' : 'hidden';
+        };
 
         const doSend = () => {
             if (this.streamController) {
@@ -248,11 +255,15 @@ export class ChatTab extends Component {
             }
             const text = input?.value.trim();
             if (!text) return;
-            if (input) input.value = '';
+            if (input) {
+                input.value = '';
+                resizeInput();
+            }
             this.send(text);
         };
 
         sendBtn?.addEventListener('click', doSend, { signal: this.signal });
+        input?.addEventListener('input', resizeInput, { signal: this.signal });
         input?.addEventListener(
             'keydown',
             (e) => {
@@ -263,6 +274,7 @@ export class ChatTab extends Component {
             },
             { signal: this.signal },
         );
+        resizeInput();
 
         this.q('#yt-chat-clear')?.addEventListener('click', () => this.clear(), { signal: this.signal });
 

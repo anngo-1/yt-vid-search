@@ -177,7 +177,7 @@
     padding: var(--yt-spacing-lg);
     border-top: 1px solid var(--yt-border-color);
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     gap: var(--yt-spacing-md);
     flex-shrink: 0;
 }
@@ -186,6 +186,12 @@
     flex: 1;
     padding: var(--yt-spacing-md) var(--yt-spacing-lg);
     font-size: var(--yt-font-size-base);
+    line-height: 1.4;
+    min-height: 36px;
+    max-height: 144px;
+    resize: none;
+    overflow-y: hidden;
+    font-family: inherit;
 }
 
 #yt-ask-send {
@@ -232,6 +238,7 @@
     background: var(--yt-color-primary);
     color: var(--yt-text-on-primary);
     border-radius: var(--yt-radius-2xl) var(--yt-radius-2xl) var(--yt-radius-sm) var(--yt-radius-2xl);
+    white-space: pre-wrap;
 }
 
 .yt-message-assistant {
