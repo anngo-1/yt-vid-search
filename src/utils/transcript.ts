@@ -52,6 +52,14 @@ interface PanelSegmentCandidate {
     text: string;
 }
 
+export function normalizeTranscriptSegments(segments: TranscriptSegment[]): TranscriptSegment[] {
+    return segments
+        .map((segment, index) => ({ segment, index }))
+        .filter(({ segment }) => Number.isFinite(segment.seconds) && segment.text.trim() !== '')
+        .sort((a, b) => a.segment.seconds - b.segment.seconds || a.index - b.index)
+        .map(({ segment }) => segment);
+}
+
 export function formatTimestampFromSeconds(seconds: number): string {
     if (!Number.isFinite(seconds) || seconds < 0) {
         return '0:00';
@@ -77,7 +85,7 @@ export function parseTranscript(json: unknown): TranscriptSegment[] {
             ?.transcriptRenderer?.content?.transcriptSearchPanelRenderer?.body?.transcriptSegmentListRenderer
             ?.initialSegments;
 
-        return (segments || [])
+        const parsed = (segments || [])
             .map((s) => s.transcriptSegmentRenderer)
             .filter((r): r is TranscriptSegmentRenderer => Boolean(r))
             .map((r) => {
@@ -87,9 +95,9 @@ export function parseTranscript(json: unknown): TranscriptSegment[] {
                     seconds: isNaN(ms) ? 0 : ms / 1000,
                     text: r.snippet?.runs?.map((x) => x.text).join('') || '',
                 };
-            })
+            });
 
-            .filter((s) => s.text.trim() !== '');
+        return normalizeTranscriptSegments(parsed);
     } catch {
         throw new TranscriptParseError('Failed to parse transcript data', json);
     }
@@ -102,7 +110,7 @@ export function parseTimedTextTranscript(json: unknown): TranscriptSegment[] {
         return [];
     }
 
-    return data.events
+    const parsed = data.events
         .map((event) => {
             const ms = typeof event.tStartMs === 'number' ? event.tStartMs : Number(event.tStartMs);
             const seconds = Number.isFinite(ms) ? ms / 1000 : 0;
@@ -120,6 +128,8 @@ export function parseTimedTextTranscript(json: unknown): TranscriptSegment[] {
             };
         })
         .filter((segment) => segment.text !== '');
+
+    return normalizeTranscriptSegments(parsed);
 }
 
 /** Parse YouTube modern transcript payload from youtubei/v1/get_panel. */
@@ -168,11 +178,13 @@ export function parsePanelTranscript(json: unknown): TranscriptSegment[] {
 
     visit(json);
 
-    return candidates.map((segment) => ({
-        time: segment.time,
-        seconds: timeToSeconds(segment.time),
-        text: segment.text,
-    }));
+    return normalizeTranscriptSegments(
+        candidates.map((segment) => ({
+            time: segment.time,
+            seconds: timeToSeconds(segment.time),
+            text: segment.text,
+        })),
+    );
 }
 
 /**

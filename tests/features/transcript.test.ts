@@ -173,6 +173,36 @@ describe('parsePanelTranscript', () => {
         expect(result[1]).toEqual({ time: '2:12', seconds: 132, text: 'second segment' });
     });
 
+    it('sorts modern panel segments by timestamp', () => {
+        const payload = {
+            items: [
+                {
+                    transcriptSegmentViewModel: {
+                        simpleText: 'middle segment',
+                        timestamp: '15:00',
+                    },
+                },
+                {
+                    transcriptSegmentViewModel: {
+                        simpleText: 'ending segment',
+                        timestamp: '1:00:00',
+                    },
+                },
+                {
+                    transcriptSegmentViewModel: {
+                        simpleText: 'opening segment',
+                        timestamp: '0:30',
+                    },
+                },
+            ],
+        };
+
+        const result = parsePanelTranscript(payload);
+
+        expect(result.map((segment) => segment.time)).toEqual(['0:30', '15:00', '1:00:00']);
+        expect(result[result.length - 1]).toEqual({ time: '1:00:00', seconds: 3600, text: 'ending segment' });
+    });
+
     it('returns empty array for invalid panel payload', () => {
         expect(parsePanelTranscript(null)).toEqual([]);
         expect(parsePanelTranscript({})).toEqual([]);

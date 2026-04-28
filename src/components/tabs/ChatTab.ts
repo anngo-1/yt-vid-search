@@ -165,7 +165,7 @@ export class ChatTab extends Component {
 
     private getMaxSeconds(): number {
         const segs = state.transcript;
-        return segs.length ? segs[segs.length - 1].seconds : 0;
+        return segs.reduce((max, segment) => Math.max(max, segment.seconds), 0);
     }
 
     private initTimeWindow(): void {
