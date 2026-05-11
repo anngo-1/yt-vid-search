@@ -38,6 +38,16 @@
     color: var(--yt-text-primary);
 }
 
+.yt-row.search-current {
+    background: rgba(255, 204, 0, 0.08);
+    box-shadow: inset 3px 0 0 var(--yt-color-warning);
+}
+
+.yt-row.search-current .yt-text mark {
+    background: var(--yt-color-warning);
+    color: var(--yt-text-on-primary);
+}
+
 .yt-time {
     color: var(--yt-color-primary);
     font-weight: var(--yt-font-weight-medium);

@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { parseTranscript } from '../../src/utils/transcript';
 import { escapeHtml } from '../../src/content/selectors';
 import { findActiveSegmentIndex } from '../../src/utils/transcript';
+import { TranscriptTab } from '../../src/components/tabs/TranscriptTab';
+import { store } from '../../src/services/store';
+import { SEARCH_DEBOUNCE_MS } from '../../src/utils/constants';
 import type { TranscriptSegment } from '../../src/types';
 
 // Mock chrome API
@@ -29,8 +32,8 @@ describe('transcript parse → render → search integration', () => {
     beforeEach(() => {
         document.body.innerHTML = `
             <div id="yt-transcript-rows"></div>
-            <div id="yt-search-results"></div>
         `;
+        store.reset('integration-test');
 
         const payload = makeResponse([
             { time: '0:00', ms: '0', text: 'Welcome to the video' },
@@ -72,62 +75,48 @@ describe('transcript parse → render → search integration', () => {
         expect(rows[1].getAttribute('data-seconds')).toBe('15');
     });
 
-    it('searches transcript and highlights matches with DOM nodes', () => {
-        const container = document.getElementById('yt-search-results')!;
-        const query = 'function';
-        const q = query.toLowerCase();
-        const matches = transcript.filter((t) => t.text.toLowerCase().includes(q));
+    it('searches inside the transcript tab without filtering rows', () => {
+        vi.useFakeTimers();
+        const tab = new TranscriptTab();
+        const parent = document.createElement('div');
+        document.body.appendChild(parent);
 
-        expect(matches).toHaveLength(2);
-        expect(matches[0].text).toBe('Functions are fundamental');
-        expect(matches[1].text).toBe('Arrow functions simplify syntax');
+        try {
+            store.set('transcript', transcript);
+            tab.mount(parent);
 
-        // Build results using DOM-based highlighting (same approach as refactored renderSearch)
-        container.innerHTML = `<div class="yt-result-count">${matches.length} results</div>`;
+            const input = parent.querySelector<HTMLInputElement>('#yt-transcript-search-input')!;
+            input.value = 'function';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
 
-        for (const m of matches) {
-            const row = document.createElement('div');
-            row.className = 'yt-row';
-            row.dataset.seconds = String(m.seconds);
+            const rows = parent.querySelectorAll('#yt-transcript-rows .yt-row');
+            expect(rows.length).toBe(7);
+            expect(parent.querySelector('#yt-transcript-search-count')?.textContent).toBe('1 / 2');
+            expect(rows[2].classList.contains('search-current')).toBe(true);
 
-            const timeDiv = document.createElement('div');
-            timeDiv.className = 'yt-time';
-            timeDiv.textContent = m.time;
+            const marks = Array.from(parent.querySelectorAll('#yt-transcript-rows mark')).map((mark) => mark.textContent);
+            expect(marks).toEqual(['Function', 'function']);
 
-            const textDiv = document.createElement('div');
-            textDiv.className = 'yt-text';
+            parent.querySelector<HTMLButtonElement>('#yt-search-next')?.click();
+            const nextRows = parent.querySelectorAll('#yt-transcript-rows .yt-row');
+            expect(parent.querySelector('#yt-transcript-search-count')?.textContent).toBe('2 / 2');
+            expect(nextRows[2]).toBe(rows[2]);
+            expect(nextRows[3]).toBe(rows[3]);
+            expect(nextRows[2].classList.contains('search-current')).toBe(false);
+            expect(nextRows[3].classList.contains('search-current')).toBe(true);
 
-            // Highlight text using DOM nodes
-            const lowerText = m.text.toLowerCase();
-            const lowerQuery = query.toLowerCase();
-            let lastIndex = 0;
-            let pos = lowerText.indexOf(lowerQuery, lastIndex);
-            while (pos !== -1) {
-                if (pos > lastIndex) {
-                    textDiv.appendChild(document.createTextNode(m.text.slice(lastIndex, pos)));
-                }
-                const mark = document.createElement('mark');
-                mark.textContent = m.text.slice(pos, pos + query.length);
-                textDiv.appendChild(mark);
-                lastIndex = pos + query.length;
-                pos = lowerText.indexOf(lowerQuery, lastIndex);
-            }
-            if (lastIndex < m.text.length) {
-                textDiv.appendChild(document.createTextNode(m.text.slice(lastIndex)));
-            }
-
-            row.append(timeDiv, textDiv);
-            container.appendChild(row);
+            parent.querySelector<HTMLButtonElement>('#yt-search-prev')?.click();
+            const prevRows = parent.querySelectorAll('#yt-transcript-rows .yt-row');
+            expect(parent.querySelector('#yt-transcript-search-count')?.textContent).toBe('1 / 2');
+            expect(prevRows[2]).toBe(rows[2]);
+            expect(prevRows[3]).toBe(rows[3]);
+            expect(prevRows[2].classList.contains('search-current')).toBe(true);
+            expect(prevRows[3].classList.contains('search-current')).toBe(false);
+        } finally {
+            tab.unmount();
+            vi.useRealTimers();
         }
-
-        const resultRows = container.querySelectorAll('.yt-row');
-        expect(resultRows.length).toBe(2);
-
-        // Check highlighting
-        const marks = container.querySelectorAll('mark');
-        expect(marks.length).toBe(2);
-        expect(marks[0].textContent).toBe('Function');
-        expect(marks[1].textContent).toBe('function');
     });
 
     it('syncs to correct segment at different times', () => {

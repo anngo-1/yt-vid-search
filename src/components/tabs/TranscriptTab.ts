@@ -11,7 +11,8 @@ import { state, persistSetting } from '@/services/state';
 import { store } from '@/services/store';
 import { escapeHtml, seekTo } from '@/content/selectors';
 import { ICONS } from '@/content/icons';
-import { FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP } from '@/utils/constants';
+import { FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, SEARCH_DEBOUNCE_MS } from '@/utils/constants';
+import { getLowercasedTranscriptText } from '@/utils/transcript-derived';
 import {
     startTranslationPrefetch,
     invalidateTranslationRequests,
@@ -23,6 +24,11 @@ const RENDER_CHUNK_SIZE = 500;
 export class TranscriptTab extends Component {
     private rowCache: HTMLElement[] | null = null;
     private renderToken = 0;
+    private searchQuery = '';
+    private searchTimeout: number | null = null;
+    private searchMatchIndices: number[] = [];
+    private activeSearchMatchIndex = -1;
+    private pendingSearchScroll = false;
 
     mount(parent: HTMLElement): void {
         this.el = document.createElement('div');
@@ -32,6 +38,7 @@ export class TranscriptTab extends Component {
         parent.appendChild(this.el);
 
         this.bindSettings();
+        this.bindTranscriptSearch();
         this.bindTranscriptClicks();
 
         // Wire translation row updater
@@ -46,6 +53,7 @@ export class TranscriptTab extends Component {
     }
 
     unmount(): void {
+        if (this.searchTimeout) window.clearTimeout(this.searchTimeout);
         setTranslationRowUpdater(null);
         super.unmount();
     }
@@ -59,16 +67,27 @@ export class TranscriptTab extends Component {
         const { transcript } = state;
         if (!transcript.length) {
             container.innerHTML = '<div class="yt-empty">loading transcript...</div>';
+            this.renderSearchStatus(null);
             this.rowCache = null;
             return;
         }
 
+        const search = createSearchContext(transcript, this.searchQuery);
+        this.syncSearchNavigation(search);
+        this.renderSearchStatus(search);
+
         this.renderToken += 1;
         const currentToken = this.renderToken;
+        const activeIndex = state.lastActiveSegmentIndex ?? -1;
+        const activeSearchSegmentIndex = this.searchMatchIndices[this.activeSearchMatchIndex] ?? -1;
 
         if (transcript.length <= RENDER_CHUNK_SIZE) {
-            container.innerHTML = transcript.map(rowHtml).join('');
+            container.innerHTML = transcript
+                .map((segment, index) => rowHtml(segment, index, search, activeIndex, activeSearchSegmentIndex))
+                .join('');
             this.rowCache = childElements(container);
+            this.updateActiveSearchRow();
+            this.scrollToActiveSearchMatch();
         } else {
             container.innerHTML = '';
             this.rowCache = [];
@@ -77,8 +96,15 @@ export class TranscriptTab extends Component {
 
             const appendChunk = () => {
                 if (this.renderToken !== currentToken) return;
-                const slice = transcript.slice(index, index + RENDER_CHUNK_SIZE);
-                container.insertAdjacentHTML('beforeend', slice.map(rowHtml).join(''));
+                const end = Math.min(index + RENDER_CHUNK_SIZE, transcript.length);
+                const currentSearchSegmentIndex = this.searchMatchIndices[this.activeSearchMatchIndex] ?? -1;
+                const html = transcript
+                    .slice(index, end)
+                    .map((segment, offset) =>
+                        rowHtml(segment, index + offset, search, activeIndex, currentSearchSegmentIndex),
+                    )
+                    .join('');
+                container.insertAdjacentHTML('beforeend', html);
 
                 const children = container.children;
                 for (let i = cachedLength; i < children.length; i++) {
@@ -87,6 +113,8 @@ export class TranscriptTab extends Component {
                 }
                 cachedLength = children.length;
                 index += RENDER_CHUNK_SIZE;
+                this.updateActiveSearchRow();
+                this.scrollToActiveSearchMatch();
 
                 if (index < transcript.length) {
                     setTimeout(appendChunk, 0);
@@ -101,6 +129,7 @@ export class TranscriptTab extends Component {
         const container = this.q('#yt-transcript-rows');
         if (!container) return;
         this.renderToken += 1;
+        this.renderSearchStatus(null);
         container.innerHTML = `<div class="yt-empty">${escapeHtml(message)}</div>`;
         this.rowCache = null;
     }
@@ -174,6 +203,131 @@ export class TranscriptTab extends Component {
             },
             { signal: this.signal },
         );
+    }
+
+    private bindTranscriptSearch(): void {
+        const input = this.q<HTMLInputElement>('#yt-transcript-search-input');
+        input?.addEventListener(
+            'input',
+            (e) => {
+                const value = (e.target as HTMLInputElement).value;
+                if (this.searchTimeout) window.clearTimeout(this.searchTimeout);
+                this.searchTimeout = window.setTimeout(() => {
+                    this.searchTimeout = null;
+                    this.searchQuery = value;
+                    this.activeSearchMatchIndex = -1;
+                    this.pendingSearchScroll = true;
+                    this.render();
+                }, SEARCH_DEBOUNCE_MS);
+            },
+            { signal: this.signal },
+        );
+
+        input?.addEventListener(
+            'keydown',
+            (e) => {
+                if (e.key !== 'Escape' || !input.value) return;
+                e.stopPropagation();
+                if (this.searchTimeout) window.clearTimeout(this.searchTimeout);
+                this.searchTimeout = null;
+                input.value = '';
+                this.searchQuery = '';
+                this.activeSearchMatchIndex = -1;
+                this.pendingSearchScroll = false;
+                this.render();
+            },
+            { signal: this.signal },
+        );
+
+        input?.addEventListener(
+            'keydown',
+            (e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                this.navigateSearch(e.shiftKey ? -1 : 1);
+            },
+            { signal: this.signal },
+        );
+
+        this.q('#yt-search-prev')?.addEventListener('click', () => this.navigateSearch(-1), { signal: this.signal });
+        this.q('#yt-search-next')?.addEventListener('click', () => this.navigateSearch(1), { signal: this.signal });
+    }
+
+    private renderSearchStatus(search: SearchRenderContext | null): void {
+        this.updateSearchStatus(!!search?.query, search?.matchCount ?? 0);
+    }
+
+    private updateSearchStatus(hasQuery: boolean, matchCount: number): void {
+        const status = this.q('#yt-transcript-search-count');
+        const prev = this.q<HTMLButtonElement>('#yt-search-prev');
+        const next = this.q<HTMLButtonElement>('#yt-search-next');
+        const disabled = !hasQuery || matchCount <= 1;
+
+        prev?.toggleAttribute('disabled', disabled);
+        next?.toggleAttribute('disabled', disabled);
+
+        if (!status) return;
+
+        if (!hasQuery) {
+            status.textContent = '';
+            return;
+        }
+
+        status.textContent = matchCount > 0 ? `${this.activeSearchMatchIndex + 1} / ${matchCount}` : '0 / 0';
+    }
+
+    private syncSearchNavigation(search: SearchRenderContext): void {
+        this.searchMatchIndices = search.matchIndices;
+
+        if (!search.query || !this.searchMatchIndices.length) {
+            this.activeSearchMatchIndex = -1;
+            this.pendingSearchScroll = false;
+            return;
+        }
+
+        if (this.activeSearchMatchIndex < 0 || this.activeSearchMatchIndex >= this.searchMatchIndices.length) {
+            this.activeSearchMatchIndex = 0;
+        }
+    }
+
+    private navigateSearch(delta: number): void {
+        if (!this.searchMatchIndices.length) return;
+        const previousSegmentIndex = this.searchMatchIndices[this.activeSearchMatchIndex] ?? -1;
+
+        this.activeSearchMatchIndex =
+            (this.activeSearchMatchIndex + delta + this.searchMatchIndices.length) % this.searchMatchIndices.length;
+        this.updateSearchStatus(!!this.searchQuery.trim(), this.searchMatchIndices.length);
+        this.updateActiveSearchRow(previousSegmentIndex);
+        this.pendingSearchScroll = true;
+        this.scrollToActiveSearchMatch();
+    }
+
+    private scrollToActiveSearchMatch(): void {
+        if (!this.pendingSearchScroll) return;
+
+        const targetIndex = this.searchMatchIndices[this.activeSearchMatchIndex];
+        if (targetIndex === undefined) {
+            this.pendingSearchScroll = false;
+            return;
+        }
+
+        const row = this.rowCache?.[targetIndex];
+        if (!row) return;
+
+        if (typeof row.scrollIntoView === 'function') {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        this.pendingSearchScroll = false;
+    }
+
+    private updateActiveSearchRow(previousSegmentIndex = -1): void {
+        if (previousSegmentIndex !== -1) {
+            this.rowCache?.[previousSegmentIndex]?.classList.remove('search-current');
+        }
+
+        const targetIndex = this.searchMatchIndices[this.activeSearchMatchIndex];
+        if (targetIndex === undefined) return;
+        this.rowCache?.[targetIndex]?.classList.add('search-current');
     }
 
     private bindSettings(): void {
@@ -344,7 +498,18 @@ export class TranscriptTab extends Component {
     private html(): string {
         return `
     <div class="yt-transcript-toolbar">
-      <span class="yt-label-small">Transcript</span>
+      <div class="yt-transcript-search">
+        <input id="yt-transcript-search-input" class="yt-input" type="search" placeholder="search transcript..." autocomplete="off">
+        <span id="yt-transcript-search-count" class="yt-result-count" aria-live="polite"></span>
+        <div class="yt-search-nav" aria-label="Search results">
+          <button class="yt-search-nav-btn" id="yt-search-prev" type="button" title="Previous match" disabled>
+            ${ICONS.CHEVRON_UP}
+          </button>
+          <button class="yt-search-nav-btn" id="yt-search-next" type="button" title="Next match" disabled>
+            ${ICONS.CHEVRON_DOWN}
+          </button>
+        </div>
+      </div>
       <button class="yt-icon-btn" id="yt-toggle-settings" title="Transcription Settings">
         ${ICONS.SETTINGS}
       </button>
@@ -415,11 +580,79 @@ export class TranscriptTab extends Component {
 
 // --- helpers ---
 
-function rowHtml(t: { seconds: number; time: string; text: string }): string {
-    return `<div class="yt-row" data-seconds="${t.seconds}">
+type TranscriptRow = { seconds: number; time: string; text: string };
+
+interface SearchRenderContext {
+    query: string;
+    lowerQuery: string;
+    loweredTranscript: string[] | null;
+    matchCount: number;
+    matchIndices: number[];
+}
+
+function createSearchContext(transcript: TranscriptRow[], rawQuery: string): SearchRenderContext {
+    const query = rawQuery.trim();
+    if (!query) {
+        return { query: '', lowerQuery: '', loweredTranscript: null, matchCount: 0, matchIndices: [] };
+    }
+
+    const lowerQuery = query.toLowerCase();
+    const loweredTranscript = getLowercasedTranscriptText(transcript);
+    const matchIndices: number[] = [];
+
+    for (let i = 0; i < loweredTranscript.length; i++) {
+        if (loweredTranscript[i].includes(lowerQuery)) matchIndices.push(i);
+    }
+
+    return { query, lowerQuery, loweredTranscript, matchCount: matchIndices.length, matchIndices };
+}
+
+function rowHtml(
+    t: TranscriptRow,
+    index: number,
+    search: SearchRenderContext,
+    activeIndex: number,
+    activeSearchSegmentIndex: number,
+): string {
+    const classes = ['yt-row'];
+    if (index === activeIndex) classes.push('active');
+    if (index === activeSearchSegmentIndex) classes.push('search-current');
+    const translated = state.translationEnabled ? state.translatedSegments[index] : '';
+
+    return `<div class="${classes.join(' ')}" data-seconds="${t.seconds}">
       <div class="yt-time">${escapeHtml(t.time)}</div>
-      <div class="yt-text">${escapeHtml(t.text)}</div>
+      <div class="yt-text">${renderTranscriptText(t.text, index, search)}${renderTranslatedText(translated)}</div>
     </div>`;
+}
+
+function renderTranscriptText(text: string, index: number, search: SearchRenderContext): string {
+    if (!search.lowerQuery || !search.loweredTranscript) return escapeHtml(text);
+
+    const lowerText = search.loweredTranscript[index];
+    if (!lowerText?.includes(search.lowerQuery)) return escapeHtml(text);
+
+    let html = '';
+    let lastIndex = 0;
+    let pos = lowerText.indexOf(search.lowerQuery, lastIndex);
+
+    while (pos !== -1) {
+        if (pos > lastIndex) {
+            html += escapeHtml(text.slice(lastIndex, pos));
+        }
+        html += `<mark>${escapeHtml(text.slice(pos, pos + search.lowerQuery.length))}</mark>`;
+        lastIndex = pos + search.lowerQuery.length;
+        pos = lowerText.indexOf(search.lowerQuery, lastIndex);
+    }
+
+    if (lastIndex < text.length) {
+        html += escapeHtml(text.slice(lastIndex));
+    }
+
+    return html;
+}
+
+function renderTranslatedText(text: string | undefined): string {
+    return text ? `<div class="yt-translated-text">${escapeHtml(text)}</div>` : '';
 }
 
 function isInView(el: HTMLElement, container: HTMLElement | null): boolean {

@@ -7,7 +7,6 @@ import '../styles/content.css';
 
 // Import tab registrations — each import triggers registerTab()
 import '@/components/tabs/TranscriptTab';
-import '@/components/tabs/SearchTab';
 import '@/components/tabs/ChatTab';
 import '@/components/tabs/TopicsTab';
 

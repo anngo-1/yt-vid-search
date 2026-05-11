@@ -68,22 +68,10 @@
     border-color: var(--yt-color-primary);
 }
 
-.yt-search-input-wrap {
-    padding: var(--yt-spacing-xl);
-    flex-shrink: 0;
-    border-bottom: 1px solid var(--yt-border-color);
-}
-
-.yt-results {
-    flex: 1;
-    overflow-y: auto;
-    min-height: 0;
-}
-
 .yt-result-count {
-    padding: var(--yt-spacing-md) var(--yt-spacing-xl);
     font-size: var(--yt-font-size-md);
     color: var(--yt-text-tertiary);
+    white-space: nowrap;
 }
 
 /* Offset Controls */
@@ -254,12 +242,67 @@
     background: var(--yt-bg-primary);
     border-bottom: 1px solid var(--yt-border-color-light);
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: var(--yt-spacing-md);
     position: sticky;
     top: 0;
     z-index: var(--yt-z-toolbar);
     flex-shrink: 0;
+}
+
+.yt-transcript-search {
+    display: flex;
+    align-items: center;
+    gap: var(--yt-spacing-md);
+    flex: 1;
+    min-width: 0;
+}
+
+.yt-transcript-search .yt-input {
+    min-width: 0;
+    flex: 1;
+    padding: var(--yt-spacing-sm) var(--yt-spacing-lg);
+    border-radius: var(--yt-radius-md);
+}
+
+#yt-transcript-search-count {
+    min-width: 34px;
+    text-align: right;
+}
+
+#yt-transcript-search-count:empty {
+    display: none;
+}
+
+.yt-search-nav {
+    display: flex;
+    align-items: center;
+    gap: var(--yt-spacing-xs);
+    flex-shrink: 0;
+}
+
+.yt-search-nav-btn {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--yt-bg-interactive);
+    border: 1px solid var(--yt-border-color);
+    border-radius: var(--yt-radius-md);
+    color: var(--yt-text-secondary);
+    cursor: pointer;
+}
+
+.yt-search-nav-btn:hover:not(:disabled) {
+    background: var(--yt-bg-interactive-hover);
+    color: var(--yt-text-primary);
+}
+
+.yt-search-nav-btn:disabled {
+    cursor: default;
+    opacity: 0.35;
 }
 
 .yt-toolbar-actions {
@@ -271,7 +314,7 @@
 .yt-expandable-controls {
     background: var(--yt-bg-secondary);
     position: sticky;
-    top: 35px; /* toolbar height approx */
+    top: 47px; /* toolbar height approx */
     z-index: var(--yt-z-sticky);
     flex-shrink: 0;
 }
