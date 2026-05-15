@@ -11,7 +11,7 @@ import {
 
 describe('skills', () => {
     it('loads packaged markdown skills', () => {
-        expect(AVAILABLE_SKILLS.map((skill) => skill.name)).toContain('summarize');
+        expect(AVAILABLE_SKILLS.map((skill) => skill.name)).toEqual(expect.arrayContaining(['challenge', 'summarize']));
     });
 
     it('parses optional frontmatter and uses markdown body as the prompt', () => {
