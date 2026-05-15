@@ -27,3 +27,19 @@ To configure LLM providers for chat, topics, and captions, click on the extensio
 
 Navigate to a YouTube video, click on the extension, and click **Open Transcript Panel**. A draggable panel will appear on the screen, granting you access to the chat, topics, and search features without leaving the video. Panel disappears when you navigate away from the video, you can re-open it for a new video by simply repeating the steps above.
 
+## Developer Skills
+
+Packaged chat skills live in `src/skills/*.md` and are bundled at build time. Add a new markdown file to that directory to make it available from the Ask box as `/<file-name>`.
+
+Skill files may include optional frontmatter:
+
+```md
+---
+name: summarize
+description: Summarize the transcript with timestamped takeaways.
+---
+
+Write the prompt instructions for this skill here.
+```
+
+Typing `/` in the Ask box opens the available skills menu. `/summarize` is included by default.

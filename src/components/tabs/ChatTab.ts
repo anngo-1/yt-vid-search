@@ -18,16 +18,25 @@ import {
     estimateUsedTokens,
     getWindowedTranscript,
 } from '@/features/chat';
-import type { Tool } from '@/types';
+import type { ChatMessage, Tool } from '@/types';
 import { resolveModel, resolveProvider } from '@/utils/llm';
 import { showToast } from '@/services/notifications';
 import { ApiError } from '@/services/errors';
 import { ICONS } from '@/content/icons';
 import { formatTimestampFromSeconds } from '@/utils/transcript';
 import { readTranscriptRange, searchTranscriptSegments } from '@/utils/transcript-derived';
+import {
+    AVAILABLE_SKILLS,
+    filterSkills,
+    isUnknownSkillCommand,
+    resolveSkillInvocation,
+    type Skill,
+} from '@/features/skills';
 
 export class ChatTab extends Component {
     private streamController: AbortController | null = null;
+    private skillPickerIndex = 0;
+    private skillMatches: Skill[] = [];
 
     private persistChatHistory(): void {
         try {
@@ -61,6 +70,7 @@ export class ChatTab extends Component {
       <div id="yt-key-warning" class="yt-key-warning" style="display:none"></div>
       <div id="yt-chat-messages" class="yt-chat-messages"></div>
       <div class="yt-ask-bar">
+        <div id="yt-skill-menu" class="yt-skill-menu" role="listbox" aria-label="Skills" style="display:none"></div>
         <textarea id="yt-ask-input" class="yt-input" placeholder="Ask about the video..." autocomplete="off" rows="1"></textarea>
         <button id="yt-ask-send">${ICONS.SEND}</button>
       </div>`;
@@ -237,9 +247,84 @@ export class ChatTab extends Component {
 
     // --- events ---
 
+    private getSkillQuery(value: string): string | null {
+        const match = value.match(/^\/([A-Za-z0-9-]*)$/);
+        return match ? match[1].toLowerCase() : null;
+    }
+
+    private isSkillPickerVisible(): boolean {
+        const menu = this.q<HTMLElement>('#yt-skill-menu');
+        return !!menu && menu.style.display !== 'none' && this.skillMatches.length > 0;
+    }
+
+    private hideSkillPicker(): void {
+        const menu = this.q<HTMLElement>('#yt-skill-menu');
+        if (menu) {
+            menu.style.display = 'none';
+            menu.innerHTML = '';
+        }
+        this.skillMatches = [];
+        this.skillPickerIndex = 0;
+    }
+
+    private renderSkillPicker(): void {
+        const menu = this.q<HTMLElement>('#yt-skill-menu');
+        if (!menu) return;
+
+        if (!this.skillMatches.length) {
+            this.hideSkillPicker();
+            return;
+        }
+
+        menu.innerHTML = this.skillMatches
+            .map((skill, index) => {
+                const active = index === this.skillPickerIndex;
+                return `
+                    <button type="button" class="yt-skill-item${active ? ' active' : ''}" data-skill="${escapeHtml(skill.name)}" role="option" aria-selected="${active ? 'true' : 'false'}">
+                        <span class="yt-skill-command">/${escapeHtml(skill.name)}</span>
+                        <span class="yt-skill-description">${escapeHtml(skill.description)}</span>
+                    </button>`;
+            })
+            .join('');
+        menu.style.display = 'block';
+    }
+
+    private updateSkillPicker(): void {
+        const input = this.q<HTMLTextAreaElement>('#yt-ask-input');
+        if (!input) return;
+
+        const query = this.getSkillQuery(input.value);
+        if (query === null) {
+            this.hideSkillPicker();
+            return;
+        }
+
+        this.skillMatches = filterSkills(query);
+        this.skillPickerIndex = Math.min(this.skillPickerIndex, Math.max(0, this.skillMatches.length - 1));
+        this.renderSkillPicker();
+    }
+
+    private moveSkillPicker(delta: number): void {
+        if (!this.skillMatches.length) return;
+        this.skillPickerIndex = (this.skillPickerIndex + delta + this.skillMatches.length) % this.skillMatches.length;
+        this.renderSkillPicker();
+    }
+
+    private selectSkill(skill: Skill): void {
+        const input = this.q<HTMLTextAreaElement>('#yt-ask-input');
+        if (!input) return;
+
+        input.value = `/${skill.name} `;
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+        this.hideSkillPicker();
+        input.dispatchEvent(new Event('input'));
+    }
+
     private bindEvents(): void {
         const input = this.q<HTMLTextAreaElement>('#yt-ask-input');
         const sendBtn = this.q('#yt-ask-send');
+        const skillMenu = this.q<HTMLElement>('#yt-skill-menu');
 
         const resizeInput = () => {
             if (!input) return;
@@ -263,10 +348,49 @@ export class ChatTab extends Component {
         };
 
         sendBtn?.addEventListener('click', doSend, { signal: this.signal });
-        input?.addEventListener('input', resizeInput, { signal: this.signal });
+        input?.addEventListener(
+            'input',
+            () => {
+                resizeInput();
+                this.updateSkillPicker();
+            },
+            { signal: this.signal },
+        );
         input?.addEventListener(
             'keydown',
             (e) => {
+                if (this.isSkillPickerVisible()) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        this.moveSkillPicker(1);
+                        return;
+                    }
+                    if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        this.moveSkillPicker(-1);
+                        return;
+                    }
+                    if (e.key === 'Tab') {
+                        e.preventDefault();
+                        this.selectSkill(this.skillMatches[this.skillPickerIndex]);
+                        return;
+                    }
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        const query = input ? this.getSkillQuery(input.value) : null;
+                        const exact = query ? AVAILABLE_SKILLS.find((skill) => skill.name === query) : null;
+                        if (!exact) {
+                            e.preventDefault();
+                            this.selectSkill(this.skillMatches[this.skillPickerIndex]);
+                            return;
+                        }
+                        this.hideSkillPicker();
+                    }
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        this.hideSkillPicker();
+                        return;
+                    }
+                }
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     doSend();
@@ -274,7 +398,24 @@ export class ChatTab extends Component {
             },
             { signal: this.signal },
         );
+        input?.addEventListener('blur', () => window.setTimeout(() => this.hideSkillPicker(), 100), {
+            signal: this.signal,
+        });
         resizeInput();
+
+        skillMenu?.addEventListener('mousedown', (e) => e.preventDefault(), { signal: this.signal });
+        skillMenu?.addEventListener(
+            'click',
+            (e) => {
+                const target = e.target;
+                if (!(target instanceof HTMLElement)) return;
+                const item = target.closest<HTMLElement>('[data-skill]');
+                const name = item?.dataset.skill;
+                const skill = name ? AVAILABLE_SKILLS.find((candidate) => candidate.name === name) : null;
+                if (skill) this.selectSkill(skill);
+            },
+            { signal: this.signal },
+        );
 
         this.q('#yt-chat-clear')?.addEventListener('click', () => this.clear(), { signal: this.signal });
 
@@ -341,14 +482,24 @@ export class ChatTab extends Component {
     }
 
     private async send(text: string): Promise<void> {
+        if (isUnknownSkillCommand(text)) {
+            const command = text.match(/^\/([A-Za-z][A-Za-z0-9-]*)/)?.[1] ?? '';
+            showToast(`Unknown skill: /${command}`, 'error');
+            return;
+        }
+
         if (!isProviderConfigured()) {
             showToast('No provider configured. Set up in extension popup.', 'error');
             return;
         }
 
+        const skillInvocation = resolveSkillInvocation(text);
+        const displayText = skillInvocation?.displayText ?? text;
+        const modelText = skillInvocation?.modelText ?? text;
+
         store.set('isChatCleared', false);
-        this.addMessage('user', text);
-        store.set('chatHistory', [...state.chatHistory, { role: 'user', content: text }]);
+        this.addMessage('user', displayText);
+        store.set('chatHistory', [...state.chatHistory, { role: 'user', content: displayText }]);
         this.persistChatHistory();
         this.updateContextBar();
 
@@ -356,9 +507,19 @@ export class ChatTab extends Component {
         const historyToSend = noHistory
             ? state.chatHistory.slice(-1) // only the current user message
             : state.chatHistory;
+        const apiHistoryToSend = historyToSend.map((message, index) =>
+            index === historyToSend.length - 1 && message.role === 'user'
+                ? { ...message, content: modelText }
+                : message,
+        );
+        const currentUserApiMessage = apiHistoryToSend[apiHistoryToSend.length - 1] ?? null;
         const systemPrompt = historyToSend.length <= 1 ? buildFullSystemPrompt() : buildFollowUpSystemPrompt();
 
-        const currentMessages = buildMessages(systemPrompt, historyToSend);
+        const currentMessages = buildMessages(systemPrompt, apiHistoryToSend);
+        const visibleMessages = (): ChatMessage[] =>
+            currentMessages
+                .filter((m) => m.role !== 'system')
+                .map((m) => (m === currentUserApiMessage ? { ...m, content: displayText } : m));
 
         const container = this.q('#yt-chat-messages');
         if (!container) return;
@@ -468,10 +629,7 @@ export class ChatTab extends Component {
                 currentMessages.push(assistantMsg);
 
                 // Keep the state up to date minus the system prompt
-                store.set(
-                    'chatHistory',
-                    currentMessages.filter((m) => m.role !== 'system'),
-                );
+                store.set('chatHistory', visibleMessages());
                 this.persistChatHistory();
                 this.updateContextBar();
 
@@ -557,10 +715,7 @@ export class ChatTab extends Component {
                     }
 
                     // Update state again before the next loop
-                    store.set(
-                        'chatHistory',
-                        currentMessages.filter((m) => m.role !== 'system'),
-                    );
+                    store.set('chatHistory', visibleMessages());
                     this.persistChatHistory();
                 }
             }
