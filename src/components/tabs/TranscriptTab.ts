@@ -26,7 +26,7 @@ export class TranscriptTab extends Component {
     private renderToken = 0;
     private searchQuery = '';
     private searchTimeout: number | null = null;
-    private searchMatchIndices: number[] = [];
+    private searchMatches: SearchMatch[] = [];
     private activeSearchMatchIndex = -1;
     private pendingSearchScroll = false;
 
@@ -79,11 +79,11 @@ export class TranscriptTab extends Component {
         this.renderToken += 1;
         const currentToken = this.renderToken;
         const activeIndex = state.lastActiveSegmentIndex ?? -1;
-        const activeSearchSegmentIndex = this.searchMatchIndices[this.activeSearchMatchIndex] ?? -1;
+        const activeSearchMatch = this.searchMatches[this.activeSearchMatchIndex] ?? null;
 
         if (transcript.length <= RENDER_CHUNK_SIZE) {
             container.innerHTML = transcript
-                .map((segment, index) => rowHtml(segment, index, search, activeIndex, activeSearchSegmentIndex))
+                .map((segment, index) => rowHtml(segment, index, search, activeIndex, activeSearchMatch))
                 .join('');
             this.rowCache = childElements(container);
             this.updateActiveSearchRow();
@@ -97,11 +97,11 @@ export class TranscriptTab extends Component {
             const appendChunk = () => {
                 if (this.renderToken !== currentToken) return;
                 const end = Math.min(index + RENDER_CHUNK_SIZE, transcript.length);
-                const currentSearchSegmentIndex = this.searchMatchIndices[this.activeSearchMatchIndex] ?? -1;
+                const currentSearchMatch = this.searchMatches[this.activeSearchMatchIndex] ?? null;
                 const html = transcript
                     .slice(index, end)
                     .map((segment, offset) =>
-                        rowHtml(segment, index + offset, search, activeIndex, currentSearchSegmentIndex),
+                        rowHtml(segment, index + offset, search, activeIndex, currentSearchMatch),
                     )
                     .join('');
                 container.insertAdjacentHTML('beforeend', html);
@@ -277,27 +277,27 @@ export class TranscriptTab extends Component {
     }
 
     private syncSearchNavigation(search: SearchRenderContext): void {
-        this.searchMatchIndices = search.matchIndices;
+        this.searchMatches = search.matches;
 
-        if (!search.query || !this.searchMatchIndices.length) {
+        if (!search.query || !this.searchMatches.length) {
             this.activeSearchMatchIndex = -1;
             this.pendingSearchScroll = false;
             return;
         }
 
-        if (this.activeSearchMatchIndex < 0 || this.activeSearchMatchIndex >= this.searchMatchIndices.length) {
+        if (this.activeSearchMatchIndex < 0 || this.activeSearchMatchIndex >= this.searchMatches.length) {
             this.activeSearchMatchIndex = 0;
         }
     }
 
     private navigateSearch(delta: number): void {
-        if (!this.searchMatchIndices.length) return;
-        const previousSegmentIndex = this.searchMatchIndices[this.activeSearchMatchIndex] ?? -1;
+        if (!this.searchMatches.length) return;
+        const previousMatch = this.searchMatches[this.activeSearchMatchIndex] ?? null;
 
         this.activeSearchMatchIndex =
-            (this.activeSearchMatchIndex + delta + this.searchMatchIndices.length) % this.searchMatchIndices.length;
-        this.updateSearchStatus(!!this.searchQuery.trim(), this.searchMatchIndices.length);
-        this.updateActiveSearchRow(previousSegmentIndex);
+            (this.activeSearchMatchIndex + delta + this.searchMatches.length) % this.searchMatches.length;
+        this.updateSearchStatus(!!this.searchQuery.trim(), this.searchMatches.length);
+        this.updateActiveSearchRow(previousMatch);
         this.pendingSearchScroll = true;
         this.scrollToActiveSearchMatch();
     }
@@ -305,29 +305,35 @@ export class TranscriptTab extends Component {
     private scrollToActiveSearchMatch(): void {
         if (!this.pendingSearchScroll) return;
 
-        const targetIndex = this.searchMatchIndices[this.activeSearchMatchIndex];
-        if (targetIndex === undefined) {
+        const target = this.searchMatches[this.activeSearchMatchIndex];
+        if (!target) {
             this.pendingSearchScroll = false;
             return;
         }
 
-        const row = this.rowCache?.[targetIndex];
+        const row = this.rowCache?.[target.segmentIndex];
         if (!row) return;
 
-        if (typeof row.scrollIntoView === 'function') {
-            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+        const targetEl = findSearchMark(row, target) ?? row;
+        centerElementInContainer(targetEl, this.q('#yt-transcript-rows'));
         this.pendingSearchScroll = false;
     }
 
-    private updateActiveSearchRow(previousSegmentIndex = -1): void {
-        if (previousSegmentIndex !== -1) {
-            this.rowCache?.[previousSegmentIndex]?.classList.remove('search-current');
+    private updateActiveSearchRow(previousMatch: SearchMatch | null = null): void {
+        const target = this.searchMatches[this.activeSearchMatchIndex] ?? null;
+
+        if (previousMatch) {
+            const previousRow = this.rowCache?.[previousMatch.segmentIndex];
+            findSearchMark(previousRow, previousMatch)?.classList.remove('search-current-match');
+            if (previousMatch.segmentIndex !== target?.segmentIndex) {
+                previousRow?.classList.remove('search-current');
+            }
         }
 
-        const targetIndex = this.searchMatchIndices[this.activeSearchMatchIndex];
-        if (targetIndex === undefined) return;
-        this.rowCache?.[targetIndex]?.classList.add('search-current');
+        if (!target) return;
+        const targetRow = this.rowCache?.[target.segmentIndex];
+        targetRow?.classList.add('search-current');
+        findSearchMark(targetRow, target)?.classList.add('search-current-match');
     }
 
     private bindSettings(): void {
@@ -582,29 +588,42 @@ export class TranscriptTab extends Component {
 
 type TranscriptRow = { seconds: number; time: string; text: string };
 
+interface SearchMatch {
+    segmentIndex: number;
+    start: number;
+    ordinalInSegment: number;
+}
+
 interface SearchRenderContext {
     query: string;
     lowerQuery: string;
     loweredTranscript: string[] | null;
     matchCount: number;
-    matchIndices: number[];
+    matches: SearchMatch[];
 }
 
 function createSearchContext(transcript: TranscriptRow[], rawQuery: string): SearchRenderContext {
     const query = rawQuery.trim();
     if (!query) {
-        return { query: '', lowerQuery: '', loweredTranscript: null, matchCount: 0, matchIndices: [] };
+        return { query: '', lowerQuery: '', loweredTranscript: null, matchCount: 0, matches: [] };
     }
 
     const lowerQuery = query.toLowerCase();
     const loweredTranscript = getLowercasedTranscriptText(transcript);
-    const matchIndices: number[] = [];
+    const matches: SearchMatch[] = [];
 
     for (let i = 0; i < loweredTranscript.length; i++) {
-        if (loweredTranscript[i].includes(lowerQuery)) matchIndices.push(i);
+        let ordinalInSegment = 0;
+        let pos = loweredTranscript[i].indexOf(lowerQuery);
+
+        while (pos !== -1) {
+            matches.push({ segmentIndex: i, start: pos, ordinalInSegment });
+            ordinalInSegment += 1;
+            pos = loweredTranscript[i].indexOf(lowerQuery, pos + lowerQuery.length);
+        }
     }
 
-    return { query, lowerQuery, loweredTranscript, matchCount: matchIndices.length, matchIndices };
+    return { query, lowerQuery, loweredTranscript, matchCount: matches.length, matches };
 }
 
 function rowHtml(
@@ -612,20 +631,25 @@ function rowHtml(
     index: number,
     search: SearchRenderContext,
     activeIndex: number,
-    activeSearchSegmentIndex: number,
+    activeSearchMatch: SearchMatch | null,
 ): string {
     const classes = ['yt-row'];
     if (index === activeIndex) classes.push('active');
-    if (index === activeSearchSegmentIndex) classes.push('search-current');
+    if (index === activeSearchMatch?.segmentIndex) classes.push('search-current');
     const translated = state.translationEnabled ? state.translatedSegments[index] : '';
 
     return `<div class="${classes.join(' ')}" data-seconds="${t.seconds}">
       <div class="yt-time">${escapeHtml(t.time)}</div>
-      <div class="yt-text">${renderTranscriptText(t.text, index, search)}${renderTranslatedText(translated)}</div>
+      <div class="yt-text">${renderTranscriptText(t.text, index, search, activeSearchMatch)}${renderTranslatedText(translated)}</div>
     </div>`;
 }
 
-function renderTranscriptText(text: string, index: number, search: SearchRenderContext): string {
+function renderTranscriptText(
+    text: string,
+    index: number,
+    search: SearchRenderContext,
+    activeSearchMatch: SearchMatch | null,
+): string {
     if (!search.lowerQuery || !search.loweredTranscript) return escapeHtml(text);
 
     const lowerText = search.loweredTranscript[index];
@@ -634,13 +658,23 @@ function renderTranscriptText(text: string, index: number, search: SearchRenderC
     let html = '';
     let lastIndex = 0;
     let pos = lowerText.indexOf(search.lowerQuery, lastIndex);
+    let ordinalInSegment = 0;
 
     while (pos !== -1) {
         if (pos > lastIndex) {
             html += escapeHtml(text.slice(lastIndex, pos));
         }
-        html += `<mark>${escapeHtml(text.slice(pos, pos + search.lowerQuery.length))}</mark>`;
+        const activeClass =
+            activeSearchMatch?.segmentIndex === index &&
+            activeSearchMatch.start === pos &&
+            activeSearchMatch.ordinalInSegment === ordinalInSegment
+                ? ' class="search-current-match"'
+                : '';
+        html += `<mark${activeClass} data-search-start="${pos}" data-search-ordinal="${ordinalInSegment}">${escapeHtml(
+            text.slice(pos, pos + search.lowerQuery.length),
+        )}</mark>`;
         lastIndex = pos + search.lowerQuery.length;
+        ordinalInSegment += 1;
         pos = lowerText.indexOf(search.lowerQuery, lastIndex);
     }
 
@@ -660,6 +694,35 @@ function isInView(el: HTMLElement, container: HTMLElement | null): boolean {
     const elRect = el.getBoundingClientRect();
     const cRect = container.getBoundingClientRect();
     return elRect.top >= cRect.top && elRect.bottom <= cRect.bottom;
+}
+
+function findSearchMark(row: HTMLElement | undefined, match: SearchMatch): HTMLElement | null {
+    return (
+        row?.querySelector<HTMLElement>(
+            `mark[data-search-start="${match.start}"][data-search-ordinal="${match.ordinalInSegment}"]`,
+        ) ?? null
+    );
+}
+
+function centerElementInContainer(target: HTMLElement, container: HTMLElement | null): void {
+    if (!container) {
+        if (typeof target.scrollIntoView === 'function') {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+        }
+        return;
+    }
+
+    const targetRect = target.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const targetCenter = targetRect.top - containerRect.top + container.scrollTop + targetRect.height / 2;
+    const top = targetCenter - container.clientHeight / 2;
+
+    const nextScrollTop = Math.max(0, top);
+    if (typeof container.scrollTo === 'function') {
+        container.scrollTo({ top: nextScrollTop, behavior: 'smooth' });
+    } else {
+        container.scrollTop = nextScrollTop;
+    }
 }
 
 function childElements(container: HTMLElement): HTMLElement[] {

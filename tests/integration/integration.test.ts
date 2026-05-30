@@ -119,6 +119,89 @@ describe('transcript parse → render → search integration', () => {
         }
     });
 
+    it('moves search navigation through each highlighted occurrence', () => {
+        vi.useFakeTimers();
+        const tab = new TranscriptTab();
+        const parent = document.createElement('div');
+        document.body.appendChild(parent);
+
+        try {
+            store.set('transcript', [
+                { time: '0:00', seconds: 0, text: 'function then function again' },
+                { time: '0:10', seconds: 10, text: 'no match here' },
+                { time: '0:20', seconds: 20, text: 'final function' },
+            ]);
+            tab.mount(parent);
+
+            const input = parent.querySelector<HTMLInputElement>('#yt-transcript-search-input')!;
+            input.value = 'function';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+
+            const rows = parent.querySelectorAll('#yt-transcript-rows .yt-row');
+            let marks = parent.querySelectorAll('#yt-transcript-rows mark');
+            expect(parent.querySelector('#yt-transcript-search-count')?.textContent).toBe('1 / 3');
+            expect(rows[0].classList.contains('search-current')).toBe(true);
+            expect(marks[0].classList.contains('search-current-match')).toBe(true);
+
+            parent.querySelector<HTMLButtonElement>('#yt-search-next')?.click();
+            marks = parent.querySelectorAll('#yt-transcript-rows mark');
+            expect(parent.querySelector('#yt-transcript-search-count')?.textContent).toBe('2 / 3');
+            expect(rows[0].classList.contains('search-current')).toBe(true);
+            expect(marks[0].classList.contains('search-current-match')).toBe(false);
+            expect(marks[1].classList.contains('search-current-match')).toBe(true);
+
+            parent.querySelector<HTMLButtonElement>('#yt-search-next')?.click();
+            marks = parent.querySelectorAll('#yt-transcript-rows mark');
+            expect(parent.querySelector('#yt-transcript-search-count')?.textContent).toBe('3 / 3');
+            expect(rows[0].classList.contains('search-current')).toBe(false);
+            expect(rows[2].classList.contains('search-current')).toBe(true);
+            expect(marks[1].classList.contains('search-current-match')).toBe(false);
+            expect(marks[2].classList.contains('search-current-match')).toBe(true);
+        } finally {
+            tab.unmount();
+            vi.useRealTimers();
+        }
+    });
+
+    it('centers the active search mark in the transcript scroller', () => {
+        vi.useFakeTimers();
+        const tab = new TranscriptTab();
+        const parent = document.createElement('div');
+        document.body.appendChild(parent);
+
+        try {
+            store.set('transcript', [{ time: '0:00', seconds: 0, text: 'function then function again' }]);
+            tab.mount(parent);
+
+            const input = parent.querySelector<HTMLInputElement>('#yt-transcript-search-input')!;
+            input.value = 'function';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+
+            const scroller = parent.querySelector<HTMLElement>('#yt-transcript-rows')!;
+            const marks = parent.querySelectorAll<HTMLElement>('#yt-transcript-rows mark');
+            scroller.scrollTop = 100;
+            Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 200 });
+            scroller.getBoundingClientRect = () =>
+                ({ top: 10, bottom: 210, left: 0, right: 320, width: 320, height: 200 } as DOMRect);
+            marks[1].getBoundingClientRect = () =>
+                ({ top: 510, bottom: 530, left: 0, right: 80, width: 80, height: 20 } as DOMRect);
+            const scrollTo = vi.fn((options: ScrollToOptions) => {
+                scroller.scrollTop = Number(options.top ?? 0);
+            });
+            Object.defineProperty(scroller, 'scrollTo', { configurable: true, value: scrollTo });
+
+            parent.querySelector<HTMLButtonElement>('#yt-search-next')?.click();
+
+            expect(scrollTo).toHaveBeenCalledWith({ top: 510, behavior: 'smooth' });
+            expect(scroller.scrollTop).toBe(510);
+        } finally {
+            tab.unmount();
+            vi.useRealTimers();
+        }
+    });
+
     it('syncs to correct segment at different times', () => {
         expect(findActiveSegmentIndex(transcript, 0)).toBe(0);
         expect(findActiveSegmentIndex(transcript, 10)).toBe(0);
