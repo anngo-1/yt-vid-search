@@ -291,7 +291,8 @@ export class TranscriptTab extends Component {
     private stopTranscriptScroll(): void {
         const container = this.q('#yt-transcript-rows');
         if (container) {
-            container.scrollTo({ top: container.scrollTop, behavior: 'auto' });
+            const currentScrollTop = container.scrollTop;
+            container.scrollTop = currentScrollTop;
         }
     }
 
