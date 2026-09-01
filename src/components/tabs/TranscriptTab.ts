@@ -153,7 +153,12 @@ export class TranscriptTab extends Component {
         if (next !== -1 && this.rowCache[next]) {
             const row = this.rowCache[next];
             row.classList.add('active');
-            if (state.autoSync && state.panelOpen && !isInView(row, this.q('#yt-transcript-rows'))) {
+            if (
+                state.autoSync &&
+                state.panelOpen &&
+                !this.isSearchActive() &&
+                !isInView(row, this.q('#yt-transcript-rows'))
+            ) {
                 row.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
@@ -212,12 +217,11 @@ export class TranscriptTab extends Component {
             (e) => {
                 const value = (e.target as HTMLInputElement).value;
                 if (this.searchTimeout) window.clearTimeout(this.searchTimeout);
+                this.stopTranscriptScroll();
+                this.updateSyncStatus();
                 this.searchTimeout = window.setTimeout(() => {
                     this.searchTimeout = null;
-                    this.searchQuery = value;
-                    this.activeSearchMatchIndex = -1;
-                    this.pendingSearchScroll = true;
-                    this.render();
+                    this.applySearch(value);
                 }, SEARCH_DEBOUNCE_MS);
             },
             { signal: this.signal },
@@ -231,10 +235,7 @@ export class TranscriptTab extends Component {
                 if (this.searchTimeout) window.clearTimeout(this.searchTimeout);
                 this.searchTimeout = null;
                 input.value = '';
-                this.searchQuery = '';
-                this.activeSearchMatchIndex = -1;
-                this.pendingSearchScroll = false;
-                this.render();
+                this.applySearch('');
             },
             { signal: this.signal },
         );
@@ -244,6 +245,16 @@ export class TranscriptTab extends Component {
             (e) => {
                 if (e.key !== 'Enter') return;
                 e.preventDefault();
+
+                // Enter should never race the debounce. If the typed value has not
+                // rendered yet, commit it and reveal its first match immediately.
+                if (this.searchTimeout !== null || input.value !== this.searchQuery) {
+                    if (this.searchTimeout) window.clearTimeout(this.searchTimeout);
+                    this.searchTimeout = null;
+                    this.applySearch(input.value);
+                    return;
+                }
+
                 this.navigateSearch(e.shiftKey ? -1 : 1);
             },
             { signal: this.signal },
@@ -251,6 +262,42 @@ export class TranscriptTab extends Component {
 
         this.q('#yt-search-prev')?.addEventListener('click', () => this.navigateSearch(-1), { signal: this.signal });
         this.q('#yt-search-next')?.addEventListener('click', () => this.navigateSearch(1), { signal: this.signal });
+    }
+
+    private applySearch(value: string): void {
+        const wasActive = this.isSearchActive();
+        this.searchQuery = value;
+        this.activeSearchMatchIndex = -1;
+        this.pendingSearchScroll = value.trim().length > 0;
+        this.render();
+        this.updateSyncStatus();
+
+        if (wasActive && !this.isSearchActive()) {
+            this.scrollToPlaybackRow();
+        }
+    }
+
+    private isSearchActive(): boolean {
+        const inputValue = this.q<HTMLInputElement>('#yt-transcript-search-input')?.value ?? '';
+        return Boolean(inputValue.trim() || this.searchQuery.trim());
+    }
+
+    private updateSyncStatus(): void {
+        const status = this.q('#yt-sync-status');
+        if (!status) return;
+        status.textContent = state.autoSync ? (this.isSearchActive() ? 'Sync PAUSED' : 'Sync ON') : 'Sync OFF';
+    }
+
+    private stopTranscriptScroll(): void {
+        const container = this.q('#yt-transcript-rows');
+        if (container) container.scrollTop = container.scrollTop;
+    }
+
+    private scrollToPlaybackRow(): void {
+        if (!state.autoSync || !state.panelOpen) return;
+        const index = state.lastActiveSegmentIndex ?? -1;
+        const row = this.rowCache?.[index];
+        if (row) centerElementInContainer(row, this.q('#yt-transcript-rows'));
     }
 
     private renderSearchStatus(search: SearchRenderContext | null): void {
@@ -371,12 +418,8 @@ export class TranscriptTab extends Component {
             onToggle: (enabled) => {
                 store.set('autoSync', enabled);
                 persistSetting({ autoSync: enabled });
-                if (enabled) {
-                    const idx = state.lastActiveSegmentIndex;
-                    if (idx !== undefined && idx !== -1 && this.rowCache?.[idx]) {
-                        this.rowCache[idx].scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                }
+                this.updateSyncStatus();
+                if (enabled && !this.isSearchActive()) this.scrollToPlaybackRow();
             },
         });
     }
@@ -707,7 +750,7 @@ function findSearchMark(row: HTMLElement | undefined, match: SearchMatch): HTMLE
 function centerElementInContainer(target: HTMLElement, container: HTMLElement | null): void {
     if (!container) {
         if (typeof target.scrollIntoView === 'function') {
-            target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+            target.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
         }
         return;
     }
@@ -717,12 +760,9 @@ function centerElementInContainer(target: HTMLElement, container: HTMLElement | 
     const targetCenter = targetRect.top - containerRect.top + container.scrollTop + targetRect.height / 2;
     const top = targetCenter - container.clientHeight / 2;
 
-    const nextScrollTop = Math.max(0, top);
-    if (typeof container.scrollTo === 'function') {
-        container.scrollTo({ top: nextScrollTop, behavior: 'smooth' });
-    } else {
-        container.scrollTop = nextScrollTop;
-    }
+    // Search navigation is functional, not decorative. Assigning scrollTop
+    // synchronously also cancels any in-flight smooth auto-sync animation.
+    container.scrollTop = Math.max(0, top);
 }
 
 function childElements(container: HTMLElement): HTMLElement[] {

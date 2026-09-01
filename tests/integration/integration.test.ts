@@ -187,14 +187,8 @@ describe('transcript parse → render → search integration', () => {
                 ({ top: 10, bottom: 210, left: 0, right: 320, width: 320, height: 200 } as DOMRect);
             marks[1].getBoundingClientRect = () =>
                 ({ top: 510, bottom: 530, left: 0, right: 80, width: 80, height: 20 } as DOMRect);
-            const scrollTo = vi.fn((options: ScrollToOptions) => {
-                scroller.scrollTop = Number(options.top ?? 0);
-            });
-            Object.defineProperty(scroller, 'scrollTo', { configurable: true, value: scrollTo });
-
             parent.querySelector<HTMLButtonElement>('#yt-search-next')?.click();
 
-            expect(scrollTo).toHaveBeenCalledWith({ top: 510, behavior: 'smooth' });
             expect(scroller.scrollTop).toBe(510);
         } finally {
             tab.unmount();
