@@ -290,7 +290,9 @@ export class TranscriptTab extends Component {
 
     private stopTranscriptScroll(): void {
         const container = this.q('#yt-transcript-rows');
-        if (container) container.scrollTop = container.scrollTop;
+        if (container) {
+            container.scrollTo({ top: container.scrollTop, behavior: 'auto' });
+        }
     }
 
     private scrollToPlaybackRow(): void {
