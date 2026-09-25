@@ -16,6 +16,7 @@ import { getVideoId } from '@/content/selectors';
 import { Panel } from '@/components/Panel';
 import { TranscriptTab } from '@/components/tabs/TranscriptTab';
 import { clearRetryState, handleTranslationSync } from '@/features/translation';
+import { setupLiveDebug, debugFetchStarted, debugPayloadReceived, debugTranscriptParsed } from '@/features/debug';
 import {
     findActiveSegmentIndex,
     parsePanelTranscript,
@@ -48,6 +49,7 @@ function ensureSessionStorage(): void {
 
 function init(): void {
     ensureSessionStorage();
+    setupLiveDebug();
     loadSettings();
     injectTimedTextInterceptor();
     setupEventListeners();
@@ -165,6 +167,7 @@ function destroyPanel(): void {
 function handleTranscript(parsed: TranscriptSegment[], myFetchId: number): void {
     if (fetchId !== myFetchId || !state.isOurFetch) return;
     if (!parsed.length) return;
+    debugTranscriptParsed();
 
     store.set('transcript', parsed);
     store.set('fullTranscriptText', parsed.map((t) => `[${t.time}] ${t.text}`).join('\n'));
@@ -183,6 +186,7 @@ function setupTimedTextListener(): void {
 
         try {
             const requestUrl = new URL(url, window.location.href);
+            debugPayloadReceived();
             const raw = JSON.parse(body) as unknown;
 
             if (requestUrl.pathname.includes('/api/timedtext')) {
@@ -255,6 +259,7 @@ const FETCH_INITIAL_DELAY = 300;
 
 function fetchTranscript(retryCount = 0, myFetchId = ++fetchId): void {
     if (retryCount === 0) {
+        debugFetchStarted();
         store.set('isOurFetch', true);
         clearFetchTimeout();
 

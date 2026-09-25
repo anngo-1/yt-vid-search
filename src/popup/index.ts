@@ -35,6 +35,7 @@ const SETTING_FIELDS: SettingConfig[] = [
     { id: 'chatNoHistory', key: 'chat_no_history', type: 'checkbox', default: false },
     { id: 'autoGenerateTopics', key: 'auto_generate_topics', type: 'checkbox', default: undefined }, // undefined handled specially
     { id: 'autoOpenTranscript', key: 'auto_open_transcript', type: 'checkbox', default: false },
+    { id: 'liveDebug', key: 'live_debug', type: 'checkbox', default: false },
 
     // Advanced Translation
     { id: 'translationLookahead', key: 'translation_lookahead_buffer', type: 'number', default: 60 },
@@ -120,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('chatNoHistory')?.addEventListener('change', save);
     $('autoGenerateTopics')?.addEventListener('change', save);
     $('autoOpenTranscript')?.addEventListener('change', save);
+    $('liveDebug')?.addEventListener('change', save);
 });
 
 // save when popup loses focus or closes

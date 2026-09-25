@@ -39,6 +39,7 @@ export interface Settings {
 
     // General settings
     auto_open_transcript?: boolean; // Automatically open transcript panel on new video
+    live_debug?: boolean; // Opt-in local diagnostics overlay
 
     // Translation settings
     translation_lookahead_buffer?: number;

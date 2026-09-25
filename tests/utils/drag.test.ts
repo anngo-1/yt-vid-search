@@ -157,6 +157,42 @@ describe('makeDraggable', () => {
         expect(panel.style.left).toBe('');
     });
 
+    it.each([1, 2])('does not start dragging with mouse button %i', (button) => {
+        makeDraggable(panel, handle, controller.signal);
+        handle.dispatchEvent(new MouseEvent('mousedown', { button, clientX: 150, clientY: 150 }));
+        document.dispatchEvent(new MouseEvent('mousemove', { clientX: 300, clientY: 300 }));
+        expect(panel.style.left).toBe('');
+        controller.abort();
+    });
+
+    it('recognizes buttons inside Shadow DOM for mouse and touch events', () => {
+        const shadow = panel.attachShadow({ mode: 'open' });
+        const button = document.createElement('button');
+        button.innerHTML = '<svg><path d="M0 0"></path></svg>';
+        shadow.appendChild(button);
+        makeDraggable(panel, panel, controller.signal);
+        // A document hit-test only sees the host, not the shadow button.
+        document.elementFromPoint = vi.fn().mockReturnValue(panel);
+        button.querySelector('path')!.dispatchEvent(
+            new MouseEvent('mousedown', {
+                clientX: 150,
+                clientY: 150,
+                bubbles: true,
+                composed: true,
+            }),
+        );
+        button.dispatchEvent(
+            new MockTouchEvent('touchstart', {
+                bubbles: true,
+                composed: true,
+                touches: [{ clientX: 150, clientY: 150 }],
+            }),
+        );
+        document.dispatchEvent(new MouseEvent('mousemove', { clientX: 300, clientY: 300 }));
+        expect(panel.style.left).toBe('');
+        controller.abort();
+    });
+
     it('ignores clicks on .yt-caption-resize elements', () => {
         makeDraggable(panel, handle, controller.signal);
 

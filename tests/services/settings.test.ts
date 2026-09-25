@@ -63,6 +63,15 @@ describe('normalizeSettings', () => {
         expect(result.temperature).toBeUndefined();
     });
 
+    it('live debug is opt-in and only accepts boolean true', () => {
+        expect(normalizeSettings({}).live_debug).toBe(false);
+        expect(normalizeSettings({ live_debug: false }).live_debug).toBe(false);
+        expect(normalizeSettings({ live_debug: 'true' }).live_debug).toBe(false);
+        expect(normalizeSettings({ live_debug: 1 }).live_debug).toBe(false);
+        expect(normalizeSettings({ live_debug: true }).live_debug).toBe(true);
+        expect(STORAGE_KEYS).toContain('live_debug');
+    });
+
     it('auto_generate_topics is false unless explicitly true', () => {
         expect(normalizeSettings({ auto_generate_topics: false }).auto_generate_topics).toBe(false);
         expect(normalizeSettings({ auto_generate_topics: 'yes' }).auto_generate_topics).toBe(false);

@@ -22,6 +22,7 @@ export const STORAGE_KEYS: (keyof Settings)[] = [
     'chat_no_history',
     'auto_generate_topics',
     'auto_open_transcript',
+    'live_debug',
     'translation_lookahead_buffer',
     'translation_refill_threshold',
     'translation_max_concurrent',
@@ -58,6 +59,7 @@ export function normalizeSettings(data: Record<string, unknown>): Settings {
         chat_no_history: data.chat_no_history === true ? true : undefined,
         auto_generate_topics: data.auto_generate_topics === true,
         auto_open_transcript: data.auto_open_transcript === true ? true : undefined,
+        live_debug: data.live_debug === true,
 
         translation_lookahead_buffer: isFiniteNumber(data.translation_lookahead_buffer)
             ? data.translation_lookahead_buffer

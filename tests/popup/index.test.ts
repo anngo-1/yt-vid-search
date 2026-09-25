@@ -77,6 +77,7 @@ describe('popup', () => {
                     <span id="tempValue">0.7</span>
                     <input type="checkbox" id="fastFollowups">
                     <input type="checkbox" id="autoGenerateTopics">
+                    <input type="checkbox" id="liveDebug">
                     <button id="saveBtn">Save</button>
                     <button id="clearKeyBtn">Clear Keys</button>
                 </div>
@@ -178,6 +179,20 @@ describe('popup', () => {
     });
 
     describe('checkbox settings', () => {
+        it('loads and immediately persists the real live-debug checkbox', async () => {
+            mockStorage.live_debug = true;
+            await import('../../src/popup/index');
+            document.dispatchEvent(new Event('DOMContentLoaded'));
+            const checkbox = document.getElementById('liveDebug') as HTMLInputElement;
+            expect(checkbox.checked).toBe(true);
+            checkbox.checked = false;
+            checkbox.dispatchEvent(new Event('change'));
+            expect(mockStorage.live_debug).toBe(false);
+            checkbox.checked = true;
+            checkbox.dispatchEvent(new Event('change'));
+            expect(mockStorage.live_debug).toBe(true);
+        });
+
         it('saves checkbox state', () => {
             const fastFollowups = document.getElementById('fastFollowups') as HTMLInputElement;
             const autoGenerate = document.getElementById('autoGenerateTopics') as HTMLInputElement;

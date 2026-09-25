@@ -26,14 +26,14 @@ function createDragCleanup(signal: AbortSignal | null, onAbort?: () => void) {
 
     const cleanup = () => {
         if (currentMoveHandler) {
-            document.removeEventListener('mousemove', currentMoveHandler);
-            document.removeEventListener('touchmove', currentMoveHandler);
+            document.removeEventListener('mousemove', currentMoveHandler, true);
+            document.removeEventListener('touchmove', currentMoveHandler, true);
             currentMoveHandler = null;
         }
         if (currentUpHandler) {
-            document.removeEventListener('mouseup', currentUpHandler);
-            document.removeEventListener('touchend', currentUpHandler);
-            document.removeEventListener('touchcancel', currentUpHandler);
+            document.removeEventListener('mouseup', currentUpHandler, true);
+            document.removeEventListener('touchend', currentUpHandler, true);
+            document.removeEventListener('touchcancel', currentUpHandler, true);
             currentUpHandler = null;
         }
     };
@@ -44,13 +44,15 @@ function createDragCleanup(signal: AbortSignal | null, onAbort?: () => void) {
     });
 
     const attach = (onMove: (e: Event) => void, onUp: () => void) => {
+        cleanup();
         currentMoveHandler = onMove;
         currentUpHandler = onUp;
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
-        document.addEventListener('touchmove', onMove, { passive: false });
-        document.addEventListener('touchend', onUp);
-        document.addEventListener('touchcancel', onUp);
+        // Keep tracking when the pointer crosses YouTube elements that stop bubbling events.
+        document.addEventListener('mousemove', onMove, true);
+        document.addEventListener('mouseup', onUp, true);
+        document.addEventListener('touchmove', onMove, { capture: true, passive: false });
+        document.addEventListener('touchend', onUp, true);
+        document.addEventListener('touchcancel', onUp, true);
     };
 
     return { cleanup, attach };
@@ -94,16 +96,38 @@ export function makeDraggable(
     const onStart = (e: Event): void => {
         if (!isPointerEvent(e)) return;
 
-        const target =
-            'touches' in e ? document.elementFromPoint(getPointer(e).clientX, getPointer(e).clientY) : e.target;
-        if (target instanceof HTMLElement) {
-            if (target.closest('button')) return;
-            if (target.classList.contains('yt-caption-resize')) return;
+        if (e instanceof MouseEvent && e.button !== 0) return;
+        const pointer = getPointer(e);
+        // elementFromPoint/retargeted events can see only the Shadow DOM host.
+        // Use the actual inner target so buttons (including SVGs) remain clickable.
+        const target = e.composedPath()[0] ?? e.target;
+        if (target instanceof Element) {
+            if (target.closest('button, input, select, textarea, a, .yt-caption-resize')) return;
+            if (target instanceof HTMLElement) {
+                const bounds = target.getBoundingClientRect();
+                const resize = getComputedStyle(target).resize;
+                if (
+                    resize &&
+                    resize !== 'none' &&
+                    pointer.clientX >= bounds.right - 20 &&
+                    pointer.clientY >= bounds.bottom - 20
+                )
+                    return;
+                // Don't turn a scrollbar thumb press into a panel drag.
+                if (
+                    target.scrollHeight > target.clientHeight &&
+                    pointer.clientX >= bounds.left + target.clientLeft + target.clientWidth
+                )
+                    return;
+                if (
+                    target.scrollWidth > target.clientWidth &&
+                    pointer.clientY >= bounds.top + target.clientTop + target.clientHeight
+                )
+                    return;
+            }
         }
 
         handle.style.cursor = 'grabbing';
-
-        const pointer = getPointer(e);
         const rect = panel.getBoundingClientRect();
         startX = pointer.clientX;
         startY = pointer.clientY;

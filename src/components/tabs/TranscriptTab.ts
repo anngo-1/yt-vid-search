@@ -13,6 +13,7 @@ import { escapeHtml, seekTo } from '@/content/selectors';
 import { ICONS } from '@/content/icons';
 import { FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, SEARCH_DEBOUNCE_MS } from '@/utils/constants';
 import { getLowercasedTranscriptText } from '@/utils/transcript-derived';
+import { debugRenderStarted } from '@/features/debug';
 import {
     startTranslationPrefetch,
     invalidateTranslationRequests,
@@ -72,6 +73,7 @@ export class TranscriptTab extends Component {
             return;
         }
 
+        const finishDebugRender = debugRenderStarted();
         const search = createSearchContext(transcript, this.searchQuery);
         this.syncSearchNavigation(search);
         this.renderSearchStatus(search);
@@ -88,6 +90,7 @@ export class TranscriptTab extends Component {
             this.rowCache = childElements(container);
             this.updateActiveSearchRow();
             this.scrollToActiveSearchMatch();
+            finishDebugRender?.();
         } else {
             container.innerHTML = '';
             this.rowCache = [];
@@ -118,6 +121,8 @@ export class TranscriptTab extends Component {
 
                 if (index < transcript.length) {
                     setTimeout(appendChunk, 0);
+                } else {
+                    finishDebugRender?.();
                 }
             };
 
