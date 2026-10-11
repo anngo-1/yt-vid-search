@@ -38,6 +38,7 @@ export interface Settings {
     auto_generate_topics?: boolean; // Automatically generate topics when panel opens
 
     // General settings
+    default_tab?: 'transcript' | 'ask' | 'topics'; // Initial tab for a new panel
     auto_open_transcript?: boolean; // Automatically open transcript panel on new video
     live_debug?: boolean; // Opt-in local diagnostics overlay
 

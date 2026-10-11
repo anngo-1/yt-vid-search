@@ -21,6 +21,7 @@ export const STORAGE_KEYS: (keyof Settings)[] = [
     'chat_direct_mode',
     'chat_no_history',
     'auto_generate_topics',
+    'default_tab',
     'auto_open_transcript',
     'live_debug',
     'translation_lookahead_buffer',
@@ -58,6 +59,7 @@ export function normalizeSettings(data: Record<string, unknown>): Settings {
         chat_direct_mode: data.chat_direct_mode === false ? false : true, // default ON
         chat_no_history: data.chat_no_history === true ? true : undefined,
         auto_generate_topics: data.auto_generate_topics === true,
+        default_tab: data.default_tab === 'ask' || data.default_tab === 'topics' ? data.default_tab : 'transcript',
         auto_open_transcript: data.auto_open_transcript === true ? true : undefined,
         live_debug: data.live_debug === true,
 

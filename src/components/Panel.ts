@@ -50,8 +50,8 @@ export class Panel extends Component {
 
         // Tab bar - built from registry
         const tabBar = createElement('div', 'yt-tab-bar');
-        TAB_REGISTRY.forEach((def, i) => {
-            const btn = createElement('button', `yt-tab${i === 0 ? ' active' : ''}`);
+        TAB_REGISTRY.forEach((def) => {
+            const btn = createElement('button', 'yt-tab');
             btn.textContent = def.label;
             btn.dataset.tab = def.id;
             tabBar.appendChild(btn);
@@ -66,13 +66,6 @@ export class Panel extends Component {
         makeDraggable(this.el, header, this.signal);
 
         this.contentEl = content;
-
-        // Mount the initial tab only; the rest are created on first activation.
-        const initialTab = TAB_REGISTRY[0];
-        if (initialTab) {
-            this.activeTabId = initialTab.id;
-            this.mountTab(initialTab, content);
-        }
 
         // Header events
         this.q('#yt-close-btn')?.addEventListener('click', () => this.hide(), { signal: this.signal });
@@ -137,6 +130,7 @@ export class Panel extends Component {
         this.tabs.forEach((tab) => tab.unmount());
         this.tabs.clear();
         this.tabViews.clear();
+        this.activeTabId = '';
         this.contentEl = null;
         this.captionOverlay?.unmount();
         this.captionOverlay = null;
@@ -177,7 +171,19 @@ export class Panel extends Component {
     }
 
     private async initialize(): Promise<void> {
+        const signal = this.signal;
         await loadSettings();
+        if (signal.aborted) return;
+
+        // Mount the preferred tab after settings load, unless the user already picked one.
+        if (!this.activeTabId) {
+            const initialTab = TAB_REGISTRY.find((def) => def.id === state.settings.default_tab) ?? TAB_REGISTRY[0];
+            const tabBar = this.q('.yt-tab-bar');
+            if (initialTab && tabBar && this.contentEl) {
+                this.switchTab(initialTab.id, tabBar, this.contentEl);
+            }
+        }
+
         this.updateTokenCount();
         this.updateKeyWarnings();
 

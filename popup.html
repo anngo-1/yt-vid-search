@@ -146,6 +146,16 @@
         <!-- Tab 3: General -->
         <div id="tab-general" class="tab-content">
             <div class="section">
+                <label for="defaultTab">Default tab</label>
+                <select id="defaultTab">
+                    <option value="transcript">Transcript</option>
+                    <option value="ask">Ask</option>
+                    <option value="topics">Topics</option>
+                </select>
+                <div class="hint">Tab shown when opening a panel for a new video. Reopening the same video keeps your current tab.</div>
+            </div>
+
+            <div class="section">
                 <label for="temperature">Temperature</label>
                 <div class="range-container">
                     <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7" />

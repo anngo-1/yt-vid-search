@@ -30,6 +30,9 @@ const SETTING_FIELDS: SettingConfig[] = [
     { id: 'customApiKey', key: 'custom_api_key', type: 'text', default: '' },
     { id: 'customModel', key: 'custom_model', type: 'text', default: '' },
 
+    // General
+    { id: 'defaultTab', key: 'default_tab', type: 'select', default: 'transcript' },
+
     // Flags
     { id: 'chatDirectMode', key: 'chat_direct_mode', type: 'checkbox', default: true },
     { id: 'chatNoHistory', key: 'chat_no_history', type: 'checkbox', default: false },
@@ -112,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Selects
-    ['chatProvider', 'topicsProvider', 'captionsProvider'].forEach((id) => {
+    ['chatProvider', 'topicsProvider', 'captionsProvider', 'defaultTab'].forEach((id) => {
         $(id)?.addEventListener('change', save);
     });
 
@@ -142,14 +145,14 @@ function loadSettings(): void {
             if (field.type === 'checkbox') {
                 const checked = val === undefined ? field.default === true : !!val;
                 (el as HTMLInputElement).checked = checked;
+            } else if (field.type === 'select') {
+                const select = el as HTMLSelectElement;
+                // Legacy feature providers fall back to the shared provider.
+                const value = !val && field.key.endsWith('_provider') ? data.provider : val;
+                select.value = typeof value === 'string' ? value : '';
+                if (!select.value) select.value = String(field.default || '');
             } else {
-                const value = val !== undefined ? String(val) : String(field.default || '');
-                // Special case for select fallback
-                if (field.type === 'select' && !val) {
-                    (el as HTMLSelectElement).value = typeof data.provider === 'string' ? data.provider : 'local';
-                } else {
-                    (el as HTMLInputElement | HTMLSelectElement).value = value;
-                }
+                (el as HTMLInputElement).value = val !== undefined ? String(val) : String(field.default || '');
             }
         });
 
